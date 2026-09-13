@@ -89,6 +89,14 @@ class ProtocolFrontmatter(BaseModel):
                 raise ValueError(f"must be a DOI ('10.1000/xyz') or a PubMed ID ('PMID:12345678'), found: '{v}'")
         return v
 
+    @model_validator(mode='before')
+    @classmethod
+    def reject_explicit_nulls(cls, data: dict):
+        for field in ['type', 'method_origin_citation']:
+            if field in data and data[field] is None:
+                raise ValueError(f"Explicit null for '{field}' is not allowed; omit the field entirely instead")
+        return data
+
     @model_validator(mode='after')
     def validate_type_and_deps(self):
         n_deps = len(self.protocols_used) if self.protocols_used else 0

@@ -72,7 +72,7 @@ def extract_frontmatter(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
     
-    match = re.match(r'^---[\r\n]+(.*?[\r\n]+)(?:---|...)[\r\n]+', content, re.DOTALL)
+    match = re.match(r'^---[\r\n]+(.*?[\r\n]+)(?:---|\.\.\.)[\r\n]+', content, re.DOTALL)
     if not match:
         return None
         
@@ -248,18 +248,21 @@ def validate_history(file_path, frontmatter, frontmatter_reviews):
 
     # Convert frontmatter_reviews to similar dict format to compare
     fm_reviews_list = []
-    if frontmatter_reviews:
+    if isinstance(frontmatter_reviews, list):
         for r in frontmatter_reviews:
             r_dict = r.model_dump() if hasattr(r, 'model_dump') else r
+            if not isinstance(r_dict, dict):
+                continue
+                
             # Check version
-            if r_dict['protocol_version'] not in [v for i, v in enumerate(versions) if parseable[i]]:
-                errors.append(f"Review by '{r_dict['name']}' declares protocol_version '{r_dict['protocol_version']}', which has no matching entry in '## History & Reviews'")
+            if r_dict.get('protocol_version') not in [v for i, v in enumerate(versions) if parseable[i]]:
+                errors.append(f"Review by '{r_dict.get('name', 'Unknown')}' declares protocol_version '{r_dict.get('protocol_version')}', which has no matching entry in '## History & Reviews'")
                 
             fm_reviews_list.append({
-                'version': r_dict['protocol_version'],
-                'name': r_dict['name'],
-                'date': str(r_dict['date']),
-                'status': r_dict['status'],
+                'version': r_dict.get('protocol_version'),
+                'name': r_dict.get('name'),
+                'date': str(r_dict.get('date')) if r_dict.get('date') else None,
+                'status': r_dict.get('status'),
                 'orcid': r_dict.get('orcid')
             })
 
