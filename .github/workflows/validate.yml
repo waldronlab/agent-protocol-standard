@@ -23,7 +23,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install pydantic pyyaml pytest
+        run: pip install 'pydantic>=2.0.0' pyyaml pytest
 
       - name: Run validator test suite
         run: pytest tests/

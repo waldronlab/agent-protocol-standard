@@ -52,7 +52,7 @@ Optional — CI runs it on every pull request — but faster to iterate against:
 
 ```sh
 git clone https://github.com/waldronlab/agent-protocol-standard.git
-Rscript agent-protocol-standard/scripts/validate-protocol.R protocols
+python3 agent-protocol-standard/scripts/validate_protocol.py protocols
 ```
 
 It needs the R packages `rmarkdown` and `yaml`.

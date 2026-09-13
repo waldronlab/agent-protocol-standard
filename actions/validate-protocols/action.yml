@@ -21,7 +21,7 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: pip install pydantic pyyaml
+      run: pip install 'pydantic>=2.0.0' pyyaml
 
     - name: Validate protocols
       shell: bash

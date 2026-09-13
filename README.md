@@ -73,7 +73,7 @@ only genuinely immutable reference. Note that `generate-index` runs with `conten
 
 ## Development
 
-*   `Rscript tests/run-tests.R` runs the whole suite. With no protocols in this repository, it is
+*   `pytest tests/` runs the whole suite. With no protocols in this repository, it is
     the tooling's only coverage:
     *   the validator against the conforming and deliberately malformed fixtures in
         `tests/fixtures/`, and against the starter protocol in `template/`. Each invalid fixture
@@ -86,7 +86,7 @@ only genuinely immutable reference. Note that `generate-index` runs with `conten
         frontmatter through whole, and **refuses to write at all** when it finds no protocols or
         cannot determine the repository. The index-generation action commits its output, so a wrong
         or empty index would be published without anyone looking at it.
-*   `Rscript scripts/validate-protocol.R <dir>` runs the validator against a protocols directory
+*   `python3 scripts/validate_protocol.py <dir>` runs the validator against a protocols directory
     directly — point it at a checkout of a content repository to reproduce a CI failure locally.
 
 ### Releasing

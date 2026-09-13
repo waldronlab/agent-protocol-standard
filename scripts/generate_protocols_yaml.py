@@ -18,7 +18,7 @@ def main():
     if not os.path.isdir(protocols_dir):
         sys.exit(f"No '{protocols_dir}' directory found. Pass the protocols directory as the first argument.")
         
-    protocol_files = list(Path(protocols_dir).rglob("protocol.md"))
+    protocol_files = sorted(list(Path(protocols_dir).rglob("protocol.md")))
     if not protocol_files:
         sys.exit(f"No 'protocol.md' files found under '{protocols_dir}'.")
         
@@ -43,7 +43,7 @@ def main():
             continue
             
         # Add protocol URL to the metadata
-        frontmatter['protocol_url'] = f"https://raw.githubusercontent.com/{repository_name}/{repository_ref}/{file_path}"
+        frontmatter['protocol_url'] = f"https://raw.githubusercontent.com/{repository_name}/{repository_ref}/{file_path.as_posix()}"
         
         # Convert date to string if it's parsed as datetime.date
         if 'date' in frontmatter and hasattr(frontmatter['date'], 'isoformat'):

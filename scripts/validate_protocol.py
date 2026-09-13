@@ -72,7 +72,7 @@ def extract_frontmatter(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
     
-    match = re.match(r'^---[\r\n]+(.*?[\r\n]+)(?:---|\.\.\.)[\r\n]+', content, re.DOTALL)
+    match = re.match(r'^---[\r\n]+(.*?[\r\n]+)(?:---|\.\.\.)(?:[\r\n]|$)', content, re.DOTALL)
     if not match:
         return None
         
@@ -88,8 +88,9 @@ def extract_frontmatter(file_path):
 def validate_history(file_path, frontmatter, frontmatter_reviews):
     errors = []
     with open(file_path, 'r', encoding='utf-8') as f:
-        lines = [line.rstrip('\n') for line in f]
+        lines = [line.rstrip('\r\n') for line in f]
         
+    lines = strip_frontmatter_and_code(lines)
     heading_idx = [i for i, line in enumerate(lines) if re.match(r'^##[ \t]+History & Reviews[ \t]*$', line)]
     if not heading_idx:
         print("  [ERROR] Missing required '## History & Reviews' section (see PROTOCOL_STANDARD.md).")
@@ -339,7 +340,7 @@ def validate_protocol(file_path, protocols_dir):
 
     # Body sections validation
     with open(file_path, 'r', encoding='utf-8') as f:
-        body = [line.rstrip('\n') for line in f]
+        body = [line.rstrip('\r\n') for line in f]
         
     prose = strip_frontmatter_and_code(body)
     if not any(re.match(r'^##[ \t]+Materials[ \t]*$', line) for line in prose):

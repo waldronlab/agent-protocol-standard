@@ -1,7 +1,8 @@
+import re
 import pytest
 from scripts.validate_protocol import validate_protocol, extract_frontmatter
 from pathlib import Path
-import re
+
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -9,19 +10,44 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 def _matches_expected_diagnostic(expected: str, output: str) -> bool:
     if expected in output:
         return True
+        
     alt = (
         expected.replace("must be one of", "Input should be")
         .replace("must be either", "Input should be")
     )
     if alt in output:
         return True
+        
+    if "malformed 'orcid'" in expected and "Malformed ORCID" in output:
+        return True
+        
+    if "must be a single string" in expected and "Input should be a valid string" in output:
+        return True
+        
+    if "must be an array" in expected and "Input should be a valid list" in output:
+        return True
+        
+    if "missing required 'name' field" in expected and "Missing required fields: name" in output:
+        return True
+        
+    if "missing required 'authors' field" in expected and "Missing required fields: authors" in output:
+        return True
+        
+    if "must be a valid DOI or PMID" in expected and "String should match pattern" in output:
+        return True
+        
     quoted = re.findall(r"'([^']+)'", expected)
     if quoted and all(f"'{token}'" in output for token in quoted):
         return True
+        
+    # Normalized expected words logic but much stricter: require ALL words > 4 chars to be present
+    
     expected_words = [w for w in re.findall(r"[A-Za-z][A-Za-z0-9_-]*", expected.lower()) if len(w) >= 4]
     output_lower = output.lower()
-    matches = sum(1 for w in expected_words if w in output_lower)
-    return matches >= min(2, len(expected_words))
+    if expected_words and all(w in output_lower for w in expected_words):
+        return True
+        
+    return False
 
 @pytest.fixture(autouse=True)
 def set_env(monkeypatch):
@@ -56,12 +82,14 @@ def test_invalid_fixtures(capsys):
                         f"Expected diagnostic not found for {p}: {expected}"
                     )
 
-def test_template():
+def test_template(capsys):
     template_dir = Path(__file__).parent.parent / "template" / "protocols"
     if template_dir.exists():
         protocol_files = list(template_dir.rglob("protocol.md"))
         for p in protocol_files:
             assert not validate_protocol(str(p), str(template_dir))
+            output = capsys.readouterr().out
+            assert "template placeholder" in output
 
 
 def test_invalid_reviews_shape_does_not_crash(tmp_path, capsys, monkeypatch):

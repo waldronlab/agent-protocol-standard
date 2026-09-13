@@ -57,3 +57,36 @@ def test_generate_index_refuses_to_write_when_any_protocol_is_unreadable(tmp_pat
         generate_protocols_yaml.main()
 
     assert output_path.read_text(encoding="utf-8") == "sentinel\n"
+
+def test_generate_index_exits_when_protocols_dir_missing(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
+    monkeypatch.setenv("GITHUB_REF_NAME", "feature-branch")
+    monkeypatch.setattr(
+        sys, "argv", ["generate_protocols_yaml.py", "protocols", "PROTOCOLS.yaml"]
+    )
+    with pytest.raises(SystemExit, match="No 'protocols' directory found"):
+        generate_protocols_yaml.main()
+
+
+def test_generate_index_exits_when_no_protocols_found(tmp_path, monkeypatch):
+    (tmp_path / "protocols").mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
+    monkeypatch.setenv("GITHUB_REF_NAME", "feature-branch")
+    monkeypatch.setattr(
+        sys, "argv", ["generate_protocols_yaml.py", "protocols", "PROTOCOLS.yaml"]
+    )
+    with pytest.raises(SystemExit, match="No 'protocol.md' files found"):
+        generate_protocols_yaml.main()
+
+
+def test_generate_index_exits_when_no_repository_detected(tmp_path, monkeypatch):
+    write_protocol(tmp_path / "protocols/example/protocol.md", "name: example\ndate: 2026-03-01")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+    monkeypatch.setattr(
+        sys, "argv", ["generate_protocols_yaml.py", "protocols", "PROTOCOLS.yaml"]
+    )
+    with pytest.raises(SystemExit, match="Could not determine which repository"):
+        generate_protocols_yaml.main()

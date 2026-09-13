@@ -275,7 +275,7 @@ A brand-new protocol, or a release nobody has reviewed yet, still carries the se
 *No reviews yet.*
 ```
 
-These rules are enforced by `scripts/validate-protocol.R`, which runs on every pull request.
+These rules are enforced by `scripts/validate_protocol.py`, which runs on every pull request.
 
 ## Example Protocol
 
