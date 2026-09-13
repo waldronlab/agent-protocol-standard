@@ -60,6 +60,49 @@ def test_generate_index_refuses_to_write_when_any_protocol_is_unreadable(tmp_pat
 
     assert output_path.read_text(encoding="utf-8") == "sentinel\n"
 
+
+def test_generate_index_refuses_to_write_when_frontmatter_is_not_a_mapping(tmp_path, monkeypatch):
+    write_protocol(tmp_path / "protocols/bad/protocol.md", "- item")
+
+    output_path = tmp_path / "PROTOCOLS.yaml"
+    output_path.write_text("sentinel\n", encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
+    monkeypatch.setenv("GITHUB_REF_NAME", "feature-branch")
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    monkeypatch.setattr(
+        sys, "argv", ["generate_protocols_yaml.py", "protocols", "PROTOCOLS.yaml"]
+    )
+
+    with pytest.raises(SystemExit, match="Refusing to write"):
+        generate_protocols_yaml.main()
+
+    assert output_path.read_text(encoding="utf-8") == "sentinel\n"
+
+
+def test_generate_index_handles_non_mapping_reviews_items(tmp_path, monkeypatch):
+    write_protocol(
+        tmp_path / "protocols/example/protocol.md",
+        "name: example\ndate: 2026-03-01\nreviews:\n  - date\n  - name: Reviewer\n    date: 2026-02-01",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
+    monkeypatch.setenv("GITHUB_REF_NAME", "feature-branch")
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    monkeypatch.setattr(
+        sys, "argv", ["generate_protocols_yaml.py", "protocols", "PROTOCOLS.yaml"]
+    )
+
+    generate_protocols_yaml.main()
+
+    output = yaml.safe_load((tmp_path / "PROTOCOLS.yaml").read_text(encoding="utf-8"))
+    reviews = output["protocols"][0]["reviews"]
+    assert reviews[0] == "date"
+    assert reviews[1]["date"] == "2026-02-01"
+
+
 def test_generate_index_exits_when_protocols_dir_missing(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")

@@ -38,7 +38,7 @@ def main():
             print(f"  [ERROR] Failed to parse YAML frontmatter in {file_path}: {str(e)}")
             frontmatter = None
             
-        if not frontmatter:
+        if not isinstance(frontmatter, dict) or not frontmatter:
             unreadable.append(str(file_path))
             continue
             

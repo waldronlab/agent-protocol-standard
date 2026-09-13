@@ -1,10 +1,13 @@
 import re
+import sys
+import subprocess
 import pytest
 from scripts.validate_protocol import validate_protocol, extract_frontmatter
 from pathlib import Path
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _matches_expected_diagnostic(expected: str, output: str) -> bool:
@@ -156,3 +159,55 @@ protocol_citation: "10.1000/example-procedure"
     fm = extract_frontmatter(str(protocol_path))
     assert isinstance(fm, dict)
     assert fm["protocol_citation"] == "10.1000/example-procedure"
+
+
+def test_validate_protocol_cli_exits_when_protocols_dir_missing(tmp_path):
+    missing_dir = tmp_path / "missing"
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts" / "validate_protocol.py"), str(missing_dir)],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+    )
+    assert result.returncode == 1
+    assert f"No '{missing_dir}' directory found" in result.stdout
+
+
+def test_validate_protocol_cli_exits_when_no_protocols_found(tmp_path):
+    empty_dir = tmp_path / "protocols"
+    empty_dir.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts" / "validate_protocol.py"), str(empty_dir)],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+    )
+    assert result.returncode == 1
+    assert "No 'protocol.md' files found" in result.stdout
+
+
+def test_validate_protocol_cli_exits_nonzero_when_any_protocol_fails(tmp_path):
+    protocol_path = tmp_path / "protocols" / "example-protocol" / "protocol.md"
+    protocol_path.parent.mkdir(parents=True, exist_ok=True)
+    protocol_path.write_text(
+        """---
+name: example-protocol
+description: Example protocol
+version: 1.0.0
+authors:
+  - name: Ada Lovelace
+date: 2026-03-01
+status: draft
+protocol_citation: "10.1000/example-procedure"
+---
+""",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts" / "validate_protocol.py"), str(tmp_path / "protocols")],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+    )
+    assert result.returncode == 1
+    assert "Validation failed for some protocols." in result.stdout

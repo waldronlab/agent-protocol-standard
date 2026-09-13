@@ -79,10 +79,10 @@ only genuinely immutable reference. Note that `generate-index` runs with `conten
         `tests/fixtures/`, and against the starter protocol in `template/`. Each invalid fixture
         asserts the specific error it is supposed to provoke, so adding a rule to the standard means
         adding a fixture.
-    *   `tests/test-repo-utils.R` — the repository and ref detection helpers, across the remote URL
-        forms git actually produces. A local path must yield `NA` rather than a plausible but
+    *   `tests/test_repo_utils.py` — the repository and ref detection helpers, across the remote URL
+        forms git actually produces. A local path must yield `None` rather than a plausible but
         invented slug, since every `protocol_url` in a generated index is built from that answer.
-    *   `tests/test-generator.R` — that the index names the detected repository and ref, copies
+    *   `tests/test_generate_protocols_yaml.py` — that the index names the detected repository and ref, copies
         frontmatter through whole, and **refuses to write at all** when it finds no protocols or
         cannot determine the repository. The index-generation action commits its output, so a wrong
         or empty index would be published without anyone looking at it.

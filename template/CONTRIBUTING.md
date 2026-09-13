@@ -55,4 +55,4 @@ git clone https://github.com/waldronlab/agent-protocol-standard.git
 python3 agent-protocol-standard/scripts/validate_protocol.py protocols
 ```
 
-It needs the R packages `rmarkdown` and `yaml`.
+It needs the Python packages `pydantic` and `pyyaml`.
