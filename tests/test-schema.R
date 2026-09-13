@@ -78,6 +78,35 @@ baseline <- c(
   "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate."
 )
 
+
+replace_line <- function(lines, pattern, replacement) {
+  idx <- which(lines == pattern)
+  if (length(idx) == 0) stop(paste("Pattern not found:", pattern))
+  lines[idx[1]] <- replacement
+  lines
+}
+
+remove_line <- function(lines, pattern) {
+  idx <- which(lines == pattern)
+  if (length(idx) == 0) stop(paste("Pattern not found:", pattern))
+  lines[-idx[1]]
+}
+
+remove_block <- function(lines, start_pattern, end_pattern) {
+  start_idx <- which(lines == start_pattern)
+  if (length(start_idx) == 0) stop(paste("Start pattern not found:", start_pattern))
+  end_idx <- which(lines == end_pattern)
+  if (length(end_idx) == 0) stop(paste("End pattern not found:", end_pattern))
+  end_idx <- end_idx[end_idx > start_idx[1]][1]
+  lines[-(start_idx[1]:end_idx)]
+}
+
+insert_after <- function(lines, pattern, insert) {
+  idx <- which(lines == pattern)
+  if (length(idx) == 0) stop(paste("Pattern not found:", pattern))
+  c(lines[1:idx[1]], insert, if (idx[1] < length(lines)) lines[(idx[1]+1):length(lines)] else character(0))
+}
+
 run_case <- function(name, files, expected = NULL) {
   dir <- file.path(tempdir(), "schema-tests", name)
   for (f in names(files)) {
@@ -94,15 +123,18 @@ run_case <- function(name, files, expected = NULL) {
   }
 }
 
+# valid/basic
+local({
+  files <- list()
+  files[["example-protocol"]] <- baseline
+  run_case("basic", files)
+})
+
 # valid/bare-step-heading
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (41 > 0) lines[1:41] else character(0),
-    c("### Step"),
-    if (42 < length(lines)) lines[(42+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "### Step 1: Run the example tool", c("### Step"))
   files[["example-protocol"]] <- lines
   run_case("bare-step-heading", files)
 })
@@ -111,88 +143,35 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (65 > 0) lines[1:65] else character(0),
-    c("*No reviews yet.*"),
-    if (75 < length(lines)) lines[(75+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (50 > 0) lines[1:50] else character(0),
-    character(0),
-    if (58 < length(lines)) lines[(58+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (42 > 0) lines[1:42] else character(0),
-    c("Run `example-tool --input reads.fastq`."),
-    if (47 < length(lines)) lines[(47+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (31 > 0) lines[1:31] else character(0),
-    c("The dependency target for `example-composite`."),
-    if (33 < length(lines)) lines[(33+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (29 > 0) lines[1:29] else character(0),
-    c("# Example Atomic Protocol"),
-    if (30 < length(lines)) lines[(30+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (6 > 0) lines[1:6] else character(0),
-    c("date: 2026-01-15"),
-    if (18 < length(lines)) lines[(18+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (1 > 0) lines[1:1] else character(0),
-    c("name: example-atomic", "description: An atomic protocol that a composite protocol in the same repository depends on.", "version: 1.0.0"),
-    if (4 < length(lines)) lines[(4+1):length(lines)] else character(0)
-  )
+  lines <- remove_block(lines, "", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.")
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "", "*No reviews yet.*")
+  lines <- remove_block(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("Run `example-tool --input reads.fastq`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("The dependency target for `example-composite`."))
+  lines <- replace_line(lines, "# Example Protocol", c("# Example Atomic Protocol"))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-atomic", "description: An atomic protocol that a composite protocol in the same repository depends on.", "version: 1.0.0"))
   files[["example-atomic"]] <- lines
   lines <- baseline
-  lines <- c(
-    if (65 > 0) lines[1:65] else character(0),
-    c("*No reviews yet.*"),
-    if (75 < length(lines)) lines[(75+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (50 > 0) lines[1:50] else character(0),
-    character(0),
-    if (58 < length(lines)) lines[(58+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (41 > 0) lines[1:41] else character(0),
-    c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."),
-    if (47 < length(lines)) lines[(47+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (31 > 0) lines[1:31] else character(0),
-    c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."),
-    if (33 < length(lines)) lines[(33+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (29 > 0) lines[1:29] else character(0),
-    c("# Example Composite Protocol"),
-    if (30 < length(lines)) lines[(30+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (20 > 0) lines[1:20] else character(0),
-    c("type: composite", "protocols_used:", "  - name: example-atomic", "    repository: example-org/example-protocols", "    version: 1.0.0"),
-    if (24 < length(lines)) lines[(24+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (19 > 0) lines[1:19] else character(0),
-    c("protocol_citation: \"10.1000/example-procedure\""),
-    if (19 < length(lines)) lines[(19+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (6 > 0) lines[1:6] else character(0),
-    c("date: 2026-01-15"),
-    if (18 < length(lines)) lines[(18+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (1 > 0) lines[1:1] else character(0),
-    c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"),
-    if (4 < length(lines)) lines[(4+1):length(lines)] else character(0)
-  )
+  lines <- remove_block(lines, "", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.")
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "", "*No reviews yet.*")
+  lines <- remove_block(lines, "### Step 1: Run the example tool", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "### Step 1: Run the example tool", c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."))
+  lines <- replace_line(lines, "# Example Protocol", c("# Example Composite Protocol"))
+  lines <- remove_block(lines, "type: atomic", "protocols_used: []")
+  lines <- insert_after(lines, "type: atomic", c("type: composite", "protocols_used:", "  - name: example-atomic", "    repository: example-org/example-protocols", "    version: 1.0.0"))
+  lines <- insert_after(lines, "status: draft", c("protocol_citation: \"10.1000/example-procedure\""))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"))
   files[["example-composite"]] <- lines
   run_case("composite", files)
 })
@@ -201,88 +180,35 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (65 > 0) lines[1:65] else character(0),
-    c("*No reviews yet.*"),
-    if (75 < length(lines)) lines[(75+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (50 > 0) lines[1:50] else character(0),
-    character(0),
-    if (58 < length(lines)) lines[(58+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (42 > 0) lines[1:42] else character(0),
-    c("Run `example-tool --input reads.fastq`."),
-    if (47 < length(lines)) lines[(47+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (31 > 0) lines[1:31] else character(0),
-    c("The dependency target for `example-composite`."),
-    if (33 < length(lines)) lines[(33+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (29 > 0) lines[1:29] else character(0),
-    c("# Example Atomic Protocol"),
-    if (30 < length(lines)) lines[(30+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (6 > 0) lines[1:6] else character(0),
-    c("date: 2026-01-15"),
-    if (18 < length(lines)) lines[(18+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (1 > 0) lines[1:1] else character(0),
-    c("name: example-atomic", "description: An atomic protocol that a composite protocol in the same repository depends on.", "version: 1.0.0"),
-    if (4 < length(lines)) lines[(4+1):length(lines)] else character(0)
-  )
+  lines <- remove_block(lines, "", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.")
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "", "*No reviews yet.*")
+  lines <- remove_block(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("Run `example-tool --input reads.fastq`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("The dependency target for `example-composite`."))
+  lines <- replace_line(lines, "# Example Protocol", c("# Example Atomic Protocol"))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-atomic", "description: An atomic protocol that a composite protocol in the same repository depends on.", "version: 1.0.0"))
   files[["example-atomic"]] <- lines
   lines <- baseline
-  lines <- c(
-    if (65 > 0) lines[1:65] else character(0),
-    c("*No reviews yet.*"),
-    if (75 < length(lines)) lines[(75+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (50 > 0) lines[1:50] else character(0),
-    character(0),
-    if (58 < length(lines)) lines[(58+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (41 > 0) lines[1:41] else character(0),
-    c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."),
-    if (47 < length(lines)) lines[(47+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (31 > 0) lines[1:31] else character(0),
-    c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."),
-    if (33 < length(lines)) lines[(33+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (29 > 0) lines[1:29] else character(0),
-    c("# Example Composite Protocol"),
-    if (30 < length(lines)) lines[(30+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (23 > 0) lines[1:23] else character(0),
-    c("protocols_used:", "  - name: example-atomic", "    repository: example-org/example-protocols", "    version: 1.0.0"),
-    if (24 < length(lines)) lines[(24+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (20 > 0) lines[1:20] else character(0),
-    c("type: composite", "# A sequence of methods can itself be published as a method; this is permitted.", "method_origin_citation: \"10.1000/example-pipeline\""),
-    if (22 < length(lines)) lines[(22+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (6 > 0) lines[1:6] else character(0),
-    c("date: 2026-01-15"),
-    if (18 < length(lines)) lines[(18+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (1 > 0) lines[1:1] else character(0),
-    c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"),
-    if (4 < length(lines)) lines[(4+1):length(lines)] else character(0)
-  )
+  lines <- remove_block(lines, "", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.")
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "", "*No reviews yet.*")
+  lines <- remove_block(lines, "### Step 1: Run the example tool", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "### Step 1: Run the example tool", c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."))
+  lines <- replace_line(lines, "# Example Protocol", c("# Example Composite Protocol"))
+  lines <- replace_line(lines, "protocols_used: []", c("protocols_used:", "  - name: example-atomic", "    repository: example-org/example-protocols", "    version: 1.0.0"))
+  lines <- remove_block(lines, "type: atomic", "method_origin_citation: \"10.1000/example\"")
+  lines <- insert_after(lines, "type: atomic", c("type: composite", "# A sequence of methods can itself be published as a method; this is permitted.", "method_origin_citation: \"10.1000/example-pipeline\""))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"))
   files[["example-composite"]] <- lines
   run_case("composite-with-method-citation", files)
 })
@@ -291,41 +217,18 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (65 > 0) lines[1:65] else character(0),
-    c("*No reviews yet.*"),
-    if (75 < length(lines)) lines[(75+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (50 > 0) lines[1:50] else character(0),
-    character(0),
-    if (58 < length(lines)) lines[(58+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (42 > 0) lines[1:42] else character(0),
-    c("Run `example-tool --input reads.fastq`."),
-    if (47 < length(lines)) lines[(47+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (31 > 0) lines[1:31] else character(0),
-    c("The pre-review case: the section is still required, only its `#### Reviews` body is a placeholder,", "and the optional `reviews:` frontmatter field is omitted entirely."),
-    if (33 < length(lines)) lines[(33+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (29 > 0) lines[1:29] else character(0),
-    c("# Example First Release"),
-    if (30 < length(lines)) lines[(30+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (6 > 0) lines[1:6] else character(0),
-    c("date: 2026-01-15"),
-    if (18 < length(lines)) lines[(18+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (1 > 0) lines[1:1] else character(0),
-    c("name: example-first-release", "description: A first release that nobody has reviewed yet, with no 'reviews' frontmatter field.", "version: 1.0.0"),
-    if (4 < length(lines)) lines[(4+1):length(lines)] else character(0)
-  )
+  lines <- remove_block(lines, "", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.")
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "", "*No reviews yet.*")
+  lines <- remove_block(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("Run `example-tool --input reads.fastq`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("The pre-review case: the section is still required, only its `#### Reviews` body is a placeholder,", "and the optional `reviews:` frontmatter field is omitted entirely."))
+  lines <- replace_line(lines, "# Example Protocol", c("# Example First Release"))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-first-release", "description: A first release that nobody has reviewed yet, with no 'reviews' frontmatter field.", "version: 1.0.0"))
   files[["example-first-release"]] <- lines
   run_case("first-release", files)
 })
@@ -334,11 +237,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (21 > 0) lines[1:21] else character(0),
-    c("method_origin_citation: \"PMID:12345678\""),
-    if (22 < length(lines)) lines[(22+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "method_origin_citation: \"10.1000/example\"", c("method_origin_citation: \"PMID:12345678\""))
   files[["example-protocol"]] <- lines
   run_case("pmid-citation", files)
 })
@@ -347,26 +246,11 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (31 > 0) lines[1:31] else character(0),
-    c("A first definition: protocol_citation repeats collection_doi, and no method origin is claimed, exercising two releases, a reviewed older version, an unreviewed"),
-    if (32 < length(lines)) lines[(32+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (21 > 0) lines[1:21] else character(0),
-    c("protocol_citation: \"10.5281/zenodo.9999999\""),
-    if (23 < length(lines)) lines[(23+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (20 > 0) lines[1:20] else character(0),
-    c("collection_doi: \"10.5281/zenodo.9999999\""),
-    if (20 < length(lines)) lines[(20+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (2 > 0) lines[1:2] else character(0),
-    c("description: A first definition — protocol_citation repeats collection_doi, and no method origin is claimed."),
-    if (3 < length(lines)) lines[(3+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("A first definition: protocol_citation repeats collection_doi, and no method origin is claimed, exercising two releases, a reviewed older version, an unreviewed"))
+  lines <- remove_block(lines, "method_origin_citation: \"10.1000/example\"", "protocol_citation: \"10.1000/example-procedure\"")
+  lines <- insert_after(lines, "method_origin_citation: \"10.1000/example\"", c("protocol_citation: \"10.5281/zenodo.9999999\""))
+  lines <- insert_after(lines, "license: CC-BY-4.0", c("collection_doi: \"10.5281/zenodo.9999999\""))
+  lines <- replace_line(lines, "description: A minimal conforming protocol used as a fixture for the validator test suite.", c("description: A first definition — protocol_citation repeats collection_doi, and no method origin is claimed."))
   files[["example-protocol"]] <- lines
   run_case("self-cited-first-definition", files)
 })
@@ -375,16 +259,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (31 > 0) lines[1:31] else character(0),
-    c("A minimal conforming protocol at status `stable`, exercising two releases, a reviewed older version, an unreviewed"),
-    if (32 < length(lines)) lines[(32+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (18 > 0) lines[1:18] else character(0),
-    c("status: stable"),
-    if (19 < length(lines)) lines[(19+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("A minimal conforming protocol at status `stable`, exercising two releases, a reviewed older version, an unreviewed"))
+  lines <- replace_line(lines, "status: draft", c("status: stable"))
   files[["example-protocol"]] <- lines
   run_case("stable-status", files)
 })
@@ -393,26 +269,10 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (75 > 0) lines[1:75] else character(0),
-    c("", "### Version 1.1.0 (2026-03-01)", "", "#### Changes", "- Made the output path of Step 1 explicit.", "", "#### Reviews", "*No reviews yet.*"),
-    if (75 < length(lines)) lines[(75+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (51 > 0) lines[1:51] else character(0),
-    character(0),
-    if (59 < length(lines)) lines[(59+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (17 > 0) lines[1:17] else character(0),
-    c("date: 2026-01-15"),
-    if (18 < length(lines)) lines[(18+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (3 > 0) lines[1:3] else character(0),
-    c("version: 1.0.0"),
-    if (4 < length(lines)) lines[(4+1):length(lines)] else character(0)
-  )
+  lines <- insert_after(lines, "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", c("", "### Version 1.1.0 (2026-03-01)", "", "#### Changes", "- Made the output path of Step 1 explicit.", "", "#### Reviews", "*No reviews yet.*"))
+  lines <- remove_block(lines, "### Version 1.1.0 (2026-03-01)", "")
+  lines <- replace_line(lines, "date: 2026-03-01", c("date: 2026-01-15"))
+  lines <- replace_line(lines, "version: 1.1.0", c("version: 1.0.0"))
   files[["example-protocol"]] <- lines
   run_case("ascending-order", files, "Version entries must be in descending order (newest at the top), but '1.0.0' appears above '1.1.0'")
 })
@@ -421,11 +281,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (23 > 0) lines[1:23] else character(0),
-    c("protocols_used:", "  - name: other-protocol", "    repository: example/other", "    version: 1.0.0"),
-    if (24 < length(lines)) lines[(24+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "protocols_used: []", c("protocols_used:", "  - name: other-protocol", "    repository: example/other", "    version: 1.0.0"))
   files[["example-protocol"]] <- lines
   run_case("atomic-with-dependencies", files, "'type: atomic' cannot declare 'protocols_used'")
 })
@@ -434,11 +290,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (20 > 0) lines[1:20] else character(0),
-    c("type: composite"),
-    if (21 < length(lines)) lines[(21+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "type: atomic", c("type: composite"))
   files[["example-protocol"]] <- lines
   run_case("composite-without-dependencies", files, "'type: composite' requires a non-empty 'protocols_used'")
 })
@@ -447,11 +299,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (17 > 0) lines[1:17] else character(0),
-    c("date: 2026-03-02"),
-    if (18 < length(lines)) lines[(18+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "date: 2026-03-01", c("date: 2026-03-02"))
   files[["example-protocol"]] <- lines
   run_case("date-mismatch", files, "Top entry in '## History & Reviews' is dated '2026-03-01', but frontmatter declares date '2026-03-02'")
 })
@@ -460,11 +308,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (23 > 0) lines[1:23] else character(0),
-    c("citations: ~"),
-    if (23 < length(lines)) lines[(23+1):length(lines)] else character(0)
-  )
+  lines <- insert_after(lines, "protocol_citation: \"10.1000/example-procedure\"", c("citations: ~"))
   files[["example-protocol"]] <- lines
   run_case("deprecated-citations-field", files, "Deprecated 'citations' field found")
 })
@@ -473,16 +317,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (73 > 0) lines[1:73] else character(0),
-    c("- **Status:** `draft-unreviewed`"),
-    if (74 < length(lines)) lines[(74+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (16 > 0) lines[1:16] else character(0),
-    c("    status: draft-unreviewed"),
-    if (17 < length(lines)) lines[(17+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "- **Status:** `approved`", c("- **Status:** `draft-unreviewed`"))
+  lines <- replace_line(lines, "    status: approved", c("    status: draft-unreviewed"))
   files[["example-protocol"]] <- lines
   run_case("draft-unreviewed-status", files, "Review by 'Alan Turing' has invalid status 'draft-unreviewed'")
 })
@@ -491,11 +327,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (54 > 0) lines[1:54] else character(0),
-    character(0),
-    if (55 < length(lines)) lines[(55+1):length(lines)] else character(0)
-  )
+  lines <- remove_line(lines, "- Made the output path of Step 1 explicit.")
   files[["example-protocol"]] <- lines
   run_case("empty-changes", files, "Version 1.1.0 has an empty '#### Changes' subsection")
 })
@@ -504,21 +336,9 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (43 > 0) lines[1:43] else character(0),
-    c("```"),
-    if (43 < length(lines)) lines[(43+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (39 > 0) lines[1:39] else character(0),
-    c("```not-a-close", ""),
-    if (39 < length(lines)) lines[(39+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (34 > 0) lines[1:34] else character(0),
-    c("Example layout:", "", "```markdown"),
-    if (34 < length(lines)) lines[(34+1):length(lines)] else character(0)
-  )
+  lines <- insert_after(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("```"))
+  lines <- insert_after(lines, "", c("```not-a-close", ""))
+  lines <- insert_after(lines, "", c("Example layout:", "", "```markdown"))
   files[["example-protocol"]] <- lines
   run_case("fence-close-with-suffix", files, "Missing required '## Steps' section")
 })
@@ -527,11 +347,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (21 > 0) lines[1:21] else character(0),
-    c("method_origin_citation: \"see the HUMAnN 4 paper\""),
-    if (22 < length(lines)) lines[(22+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "method_origin_citation: \"10.1000/example\"", c("method_origin_citation: \"see the HUMAnN 4 paper\""))
   files[["example-protocol"]] <- lines
   run_case("free-text-method-citation", files, "must be a DOI ('10.1000/xyz') or a PubMed ID")
 })
@@ -540,11 +356,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (18 > 0) lines[1:18] else character(0),
-    c("status: banana"),
-    if (19 < length(lines)) lines[(19+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "status: draft", c("status: banana"))
   files[["example-protocol"]] <- lines
   run_case("invalid-protocol-status", files, "'status' must be one of 'draft', 'stable', 'deprecated', 'superseded'")
 })
@@ -553,16 +365,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (73 > 0) lines[1:73] else character(0),
-    c("- **Status:** `looks-good`"),
-    if (74 < length(lines)) lines[(74+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (16 > 0) lines[1:16] else character(0),
-    c("    status: looks-good"),
-    if (17 < length(lines)) lines[(17+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "- **Status:** `approved`", c("- **Status:** `looks-good`"))
+  lines <- replace_line(lines, "    status: approved", c("    status: looks-good"))
   files[["example-protocol"]] <- lines
   run_case("invalid-status", files, "Review by 'Alan Turing' has invalid status 'looks-good'")
 })
@@ -571,16 +375,9 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (21 > 0) lines[1:21] else character(0),
-    c("citation: \"10.1000/example\""),
-    if (23 < length(lines)) lines[(23+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (19 > 0) lines[1:19] else character(0),
-    c("protocol_citation: \"10.1000/example-procedure\""),
-    if (19 < length(lines)) lines[(19+1):length(lines)] else character(0)
-  )
+  lines <- remove_block(lines, "method_origin_citation: \"10.1000/example\"", "protocol_citation: \"10.1000/example-procedure\"")
+  lines <- insert_after(lines, "method_origin_citation: \"10.1000/example\"", c("citation: \"10.1000/example\""))
+  lines <- insert_after(lines, "status: draft", c("protocol_citation: \"10.1000/example-procedure\""))
   files[["example-protocol"]] <- lines
   run_case("legacy-field-name", files, "Field 'citation' was renamed to 'method_origin_citation' (see PROTOCOL_STANDARD.md) in 'example-protocol'")
 })
@@ -589,11 +386,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (23 > 0) lines[1:23] else character(0),
-    c("repository_doi: ~"),
-    if (23 < length(lines)) lines[(23+1):length(lines)] else character(0)
-  )
+  lines <- insert_after(lines, "protocol_citation: \"10.1000/example-procedure\"", c("repository_doi: ~"))
   files[["example-protocol"]] <- lines
   run_case("legacy-field-null-placeholder", files, "Field 'repository_doi' was renamed to 'collection_doi' (see PROTOCOL_STANDARD.md) in 'example-protocol'")
 })
@@ -602,11 +395,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (20 > 0) lines[1:20] else character(0),
-    c("type: [atomic, composite]"),
-    if (21 < length(lines)) lines[(21+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "type: atomic", c("type: [atomic, composite]"))
   files[["example-protocol"]] <- lines
   run_case("list-valued-type", files, "'type' must be either 'atomic' or 'composite'")
 })
@@ -615,11 +404,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (6 > 0) lines[1:6] else character(0),
-    c("    orcid: 0000-0002-1825"),
-    if (7 < length(lines)) lines[(7+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "    orcid: 0000-0002-1825-0097", c("    orcid: 0000-0002-1825"))
   files[["example-protocol"]] <- lines
   run_case("malformed-author-orcid", files, "has a malformed ORCID")
 })
@@ -628,16 +413,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (66 > 0) lines[1:66] else character(0),
-    c("**Review by Grace Hopper ([0000-0001-5109-370](https://orcid.org/0000-0001-5109-370))**"),
-    if (67 < length(lines)) lines[(67+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (9 > 0) lines[1:9] else character(0),
-    c("    orcid: 0000-0001-5109-370"),
-    if (10 < length(lines)) lines[(10+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "**Review by Grace Hopper ([0000-0001-5109-3700](https://orcid.org/0000-0001-5109-3700))**", c("**Review by Grace Hopper ([0000-0001-5109-370](https://orcid.org/0000-0001-5109-370))**"))
+  lines <- replace_line(lines, "    orcid: 0000-0001-5109-3700", c("    orcid: 0000-0001-5109-370"))
   files[["example-protocol"]] <- lines
   run_case("malformed-orcid", files, "Review by 'Grace Hopper' has a malformed 'orcid': 0000-0001-5109-370")
 })
@@ -646,51 +423,21 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (65 > 0) lines[1:65] else character(0),
-    c("*No reviews yet.*"),
-    if (75 < length(lines)) lines[(75+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (50 > 0) lines[1:50] else character(0),
-    character(0),
-    if (58 < length(lines)) lines[(58+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (41 > 0) lines[1:41] else character(0),
-    c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."),
-    if (47 < length(lines)) lines[(47+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (31 > 0) lines[1:31] else character(0),
-    c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."),
-    if (33 < length(lines)) lines[(33+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (29 > 0) lines[1:29] else character(0),
-    c("# Example Composite Protocol"),
-    if (30 < length(lines)) lines[(30+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (20 > 0) lines[1:20] else character(0),
-    c("type: composite", "protocols_used:", "  - name: example-atomic", "    repository: example-org/example-protocols", "    version: 1.0.0"),
-    if (24 < length(lines)) lines[(24+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (19 > 0) lines[1:19] else character(0),
-    c("protocol_citation: \"10.1000/example-procedure\""),
-    if (19 < length(lines)) lines[(19+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (6 > 0) lines[1:6] else character(0),
-    c("date: 2026-01-15"),
-    if (18 < length(lines)) lines[(18+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (1 > 0) lines[1:1] else character(0),
-    c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"),
-    if (4 < length(lines)) lines[(4+1):length(lines)] else character(0)
-  )
+  lines <- remove_block(lines, "", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.")
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "", "*No reviews yet.*")
+  lines <- remove_block(lines, "### Step 1: Run the example tool", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "### Step 1: Run the example tool", c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."))
+  lines <- replace_line(lines, "# Example Protocol", c("# Example Composite Protocol"))
+  lines <- remove_block(lines, "type: atomic", "protocols_used: []")
+  lines <- insert_after(lines, "type: atomic", c("type: composite", "protocols_used:", "  - name: example-atomic", "    repository: example-org/example-protocols", "    version: 1.0.0"))
+  lines <- insert_after(lines, "status: draft", c("protocol_citation: \"10.1000/example-procedure\""))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"))
   files[["example-composite"]] <- lines
   run_case("missing-local-dependency", files, "Dependent protocol 'example-atomic' not found at")
 })
@@ -699,11 +446,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (33 > 0) lines[1:33] else character(0),
-    character(0),
-    if (38 < length(lines)) lines[(38+1):length(lines)] else character(0)
-  )
+  lines <- remove_block(lines, "", "  - `example-tool` (https://example.org/example-tool) — version 1.0.")
   files[["example-protocol"]] <- lines
   run_case("missing-materials", files, "Missing required '## Materials' section")
 })
@@ -712,21 +455,9 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (31 > 0) lines[1:31] else character(0),
-    c("A protocol naming its method's origin but no publication describing the procedure, exercising two releases, a reviewed older version, an unreviewed"),
-    if (32 < length(lines)) lines[(32+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (22 > 0) lines[1:22] else character(0),
-    character(0),
-    if (23 < length(lines)) lines[(23+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (2 > 0) lines[1:2] else character(0),
-    c("description: A protocol naming its method's origin but no publication describing the procedure used as a fixture for the validator test suite."),
-    if (3 < length(lines)) lines[(3+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("A protocol naming its method's origin but no publication describing the procedure, exercising two releases, a reviewed older version, an unreviewed"))
+  lines <- remove_line(lines, "protocol_citation: \"10.1000/example-procedure\"")
+  lines <- replace_line(lines, "description: A minimal conforming protocol used as a fixture for the validator test suite.", c("description: A protocol naming its method's origin but no publication describing the procedure used as a fixture for the validator test suite."))
   files[["example-protocol"]] <- lines
   run_case("missing-protocol-citation", files, "'protocol_citation' is required")
 })
@@ -735,16 +466,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (47 > 0) lines[1:47] else character(0),
-    character(0),
-    if (75 < length(lines)) lines[(75+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (7 > 0) lines[1:7] else character(0),
-    character(0),
-    if (17 < length(lines)) lines[(17+1):length(lines)] else character(0)
-  )
+  lines <- remove_block(lines, "", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.")
+  lines <- remove_block(lines, "reviews:", "    status: approved")
   files[["example-protocol"]] <- lines
   run_case("missing-section", files, "Missing required '## History & Reviews' section")
 })
@@ -753,11 +476,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (73 > 0) lines[1:73] else character(0),
-    character(0),
-    if (74 < length(lines)) lines[(74+1):length(lines)] else character(0)
-  )
+  lines <- remove_line(lines, "- **Status:** `approved`")
   files[["example-protocol"]] <- lines
   run_case("missing-status-line", files, "Review by 'Alan Turing' under version 1.0.0 is missing a '- **Status:**' line")
 })
@@ -766,11 +485,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (39 > 0) lines[1:39] else character(0),
-    character(0),
-    if (44 < length(lines)) lines[(44+1):length(lines)] else character(0)
-  )
+  lines <- remove_block(lines, "## Steps", "")
   files[["example-protocol"]] <- lines
   run_case("missing-steps", files, "Missing required '## Steps' section")
 })
@@ -779,21 +494,9 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (43 > 0) lines[1:43] else character(0),
-    c("````"),
-    if (43 < length(lines)) lines[(43+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (39 > 0) lines[1:39] else character(0),
-    c("```", ""),
-    if (39 < length(lines)) lines[(39+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (34 > 0) lines[1:34] else character(0),
-    c("Example layout:", "", "````markdown"),
-    if (34 < length(lines)) lines[(34+1):length(lines)] else character(0)
-  )
+  lines <- insert_after(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("````"))
+  lines <- insert_after(lines, "", c("```", ""))
+  lines <- insert_after(lines, "", c("Example layout:", "", "````markdown"))
   files[["example-protocol"]] <- lines
   run_case("nested-fence-escape", files, "Missing required '## Materials' section")
 })
@@ -802,11 +505,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (1 > 0) lines[1:1] else character(0),
-    c("name: Example_Protocol"),
-    if (2 < length(lines)) lines[(2+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "name: example-protocol", c("name: Example_Protocol"))
   files[["Example_Protocol"]] <- lines
   run_case("non-kebab-name", files, "'name' must be kebab-case")
 })
@@ -815,11 +514,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (1 > 0) lines[1:1] else character(0),
-    c("name: 123"),
-    if (2 < length(lines)) lines[(2+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "name: example-protocol", c("name: 123"))
   files[["123"]] <- lines
   run_case("non-string-name", files, "'name' must be a single string")
 })
@@ -828,11 +523,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (1 > 0) lines[1:1] else character(0),
-    c("name: ~"),
-    if (2 < length(lines)) lines[(2+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "name: example-protocol", c("name: ~"))
   files[["example-protocol"]] <- lines
   run_case("null-name", files, "'name' must be a single string")
 })
@@ -841,16 +532,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (16 > 0) lines[1:16] else character(0),
-    c("    status: changes-requested"),
-    if (17 < length(lines)) lines[(17+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (14 > 0) lines[1:14] else character(0),
-    c("    date: 2026-01-21"),
-    if (15 < length(lines)) lines[(15+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "    status: approved", c("    status: changes-requested"))
+  lines <- replace_line(lines, "    date: 2026-01-20", c("    date: 2026-01-21"))
   files[["example-protocol"]] <- lines
   run_case("review-drift", files, "disagrees between the markdown block and the frontmatter: status is 'approved' in the section but 'changes-requested' in 'reviews'")
 })
@@ -859,11 +542,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (57 > 0) lines[1:57] else character(0),
-    c("", "**Review by Marie Curie**", "- **Date:** 2026-03-05", "- **Status:** `approved`", "- **Notes:** Read for scientific soundness."),
-    if (58 < length(lines)) lines[(58+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "*No reviews yet.*", c("", "**Review by Marie Curie**", "- **Date:** 2026-03-05", "- **Status:** `approved`", "- **Notes:** Read for scientific soundness."))
   files[["example-protocol"]] <- lines
   run_case("review-not-in-frontmatter", files, "Review block for version 1.1.0, reviewer 'Marie Curie' has no matching entry in the frontmatter 'reviews' array")
 })
@@ -872,11 +551,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (8 > 0) lines[1:8] else character(0),
-    c("  - name: Marie Curie", "    date: 2026-03-05", "    protocol_version: 1.1.0", "    status: approved"),
-    if (8 < length(lines)) lines[(8+1):length(lines)] else character(0)
-  )
+  lines <- insert_after(lines, "reviews:", c("  - name: Marie Curie", "    date: 2026-03-05", "    protocol_version: 1.1.0", "    status: approved"))
   files[["example-protocol"]] <- lines
   run_case("review-not-in-markdown", files, "Frontmatter review for version 1.1.0, reviewer 'Marie Curie' has no matching '**Review by ...**' block under that version")
 })
@@ -885,16 +560,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (42 > 0) lines[1:42] else character(0),
-    c("```"),
-    if (43 < length(lines)) lines[(43+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (34 > 0) lines[1:34] else character(0),
-    c("A protocol is laid out like this:", "", "```markdown"),
-    if (34 < length(lines)) lines[(34+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("```"))
+  lines <- insert_after(lines, "", c("A protocol is laid out like this:", "", "```markdown"))
   files[["example-protocol"]] <- lines
   run_case("sections-only-in-code-fence", files, "Missing required '## Materials' section")
 })
@@ -903,16 +570,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (43 > 0) lines[1:43] else character(0),
-    character(0),
-    if (45 < length(lines)) lines[(45+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (41 > 0) lines[1:41] else character(0),
-    c("The steps are described below.", "", "## Notes", ""),
-    if (41 < length(lines)) lines[(41+1):length(lines)] else character(0)
-  )
+  lines <- remove_block(lines, "", "## Notes")
+  lines <- insert_after(lines, "", c("The steps are described below.", "", "## Notes", ""))
   files[["example-protocol"]] <- lines
   run_case("step-heading-outside-steps", files, "'## Steps' contains no '### Step' heading")
 })
@@ -921,16 +580,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (43 > 0) lines[1:43] else character(0),
-    c("```"),
-    if (43 < length(lines)) lines[(43+1):length(lines)] else character(0)
-  )
-  lines <- c(
-    if (39 > 0) lines[1:39] else character(0),
-    c("Example layout:", "", "```markdown"),
-    if (39 < length(lines)) lines[(39+1):length(lines)] else character(0)
-  )
+  lines <- insert_after(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("```"))
+  lines <- insert_after(lines, "", c("Example layout:", "", "```markdown"))
   files[["example-protocol"]] <- lines
   run_case("steps-only-in-code-fence", files, "Missing required '## Steps' section")
 })
@@ -939,11 +590,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (41 > 0) lines[1:41] else character(0),
-    character(0),
-    if (42 < length(lines)) lines[(42+1):length(lines)] else character(0)
-  )
+  lines <- remove_line(lines, "### Step 1: Run the example tool")
   files[["example-protocol"]] <- lines
   run_case("steps-without-step-headings", files, "contains no '### Step' heading")
 })
@@ -952,11 +599,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (21 > 0) lines[1:21] else character(0),
-    c("method_origin_citation: \"10.0000/replace-with-a-real-doi\""),
-    if (22 < length(lines)) lines[(22+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "method_origin_citation: \"10.1000/example\"", c("method_origin_citation: \"10.0000/replace-with-a-real-doi\""))
   files[["example-protocol"]] <- lines
   run_case("template-placeholder-citation", files, "is still the template placeholder")
 })
@@ -965,11 +608,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (59 > 0) lines[1:59] else character(0),
-    c("### Verson 1.0.0 (2026-01-15)"),
-    if (60 < length(lines)) lines[(60+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "### Version 1.0.0 (2026-01-15)", c("### Verson 1.0.0 (2026-01-15)"))
   files[["example-protocol"]] <- lines
   run_case("typo-version-heading", files, "Malformed version heading '### Verson 1.0.0 (2026-01-15)'; expected '### Version X.Y.Z (YYYY-MM-DD)'")
 })
@@ -978,11 +617,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (15 > 0) lines[1:15] else character(0),
-    c("    protocol_version: 0.9.0"),
-    if (16 < length(lines)) lines[(16+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "    protocol_version: 1.0.0", c("    protocol_version: 0.9.0"))
   files[["example-protocol"]] <- lines
   run_case("unknown-protocol-version", files, "Review by 'Alan Turing' declares protocol_version '0.9.0', which has no matching entry in '## History & Reviews'")
 })
@@ -991,11 +626,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- c(
-    if (3 > 0) lines[1:3] else character(0),
-    c("version: 1.2.0"),
-    if (4 < length(lines)) lines[(4+1):length(lines)] else character(0)
-  )
+  lines <- replace_line(lines, "version: 1.1.0", c("version: 1.2.0"))
   files[["example-protocol"]] <- lines
   run_case("version-mismatch", files, "Top entry in '## History & Reviews' is version '1.1.0', but frontmatter declares version '1.2.0'")
 })
