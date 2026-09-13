@@ -101,13 +101,15 @@ for (case in cases("invalid")) {
 }
 
 # The starter protocol a new content repository copies must conform in every respect but one: its
-# 'method_citation' is a placeholder, and the validator now rejects that exact string. So the
+# 'method_origin_citation' is a placeholder, and the validator now rejects that exact string. So the
 # template is asserted to fail with precisely that error and no other. A new repository's first CI
 # run is therefore red until the adopter writes a real citation, which is the one thing the template
 # cannot do for them — and pinning the message still catches a template that has otherwise drifted
 # from the standard, which is what this check was always for.
 template_protocols <- file.path(tests_dir, "..", "template", "protocols")
-template_expected <- "is still the template placeholder"
+# Names the field, not just the placeholder text: filtering on the placeholder alone would silently
+# accept a second field carrying the same value, which is how the starter briefly failed twice.
+template_expected <- "'protocol_citation' is still the template placeholder"
 if (!dir.exists(template_protocols)) {
   cat("  [FAIL] template: no template/protocols directory\n")
   failures <- c(failures, "template")

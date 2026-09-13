@@ -4,7 +4,7 @@ description: Search, retrieve, evaluate trust, and execute citable workflows fro
 version: 2.0.0
 category: protocols
 author: waldronlab
-tags: [workflow, protocol, pipeline, method_citation, provenance]
+tags: [workflow, protocol, pipeline, method_origin_citation, provenance]
 ---
 
 # protocol-runner
@@ -26,7 +26,7 @@ Finds and executes citable, versioned analysis protocols from federated reposito
 ### 1. Discover Available Protocols
 
 1. Read `registry.yaml` from the `waldronlab/agent-protocol-standard` repository (or whatever repository the user specified, defaulting to `https://raw.githubusercontent.com/waldronlab/agent-protocol-standard/main/registry.yaml`).
-2. For each registered entry in that file, fetch its `PROTOCOLS.yaml` index using its `index_url`. Each protocol entry carries the fields this skill relies on: `name`, `description`, `version`, `date`, `status`, `type` (`atomic` | `composite`), `method_citation`, `protocol_citation`, `artifact_doi`, `collection_doi`, `license`, `protocol_url`, `upstream_repositories`, `database_urls`, `protocols_used`.
+2. For each registered entry in that file, fetch its `PROTOCOLS.yaml` index using its `index_url`. Each protocol entry carries the fields this skill relies on: `name`, `description`, `version`, `date`, `status`, `type` (`atomic` | `composite`), `method_origin_citation`, `protocol_citation`, `artifact_doi`, `collection_doi`, `license`, `protocol_url`, `upstream_repositories`, `database_urls`, `protocols_used`.
 3. Merge all protocol entries from all fetched indices into a single available protocol list. **Carry the parent metadata onto each entry as you merge it**: `trust_tier` comes from the repository's entry in `registry.yaml`, and the repository name from the index's top-level `repository` field. Neither is a property of an individual protocol, and without them the ranking and display below have nothing to work with.
 
 ### 2. Match Protocol to Request
@@ -68,8 +68,9 @@ silent substitution this skill is meant to prevent:
 
 1. For each protocol in the execution chain (dependencies first, then the main protocol):
    - Fetch the markdown content using the `protocol_url` specified in the index.
-   - For an atomic protocol, parse the singular `method_citation` YAML frontmatter field to extract the DOI or PMID (Level 2 Citation).
-   - For a composite protocol (`type: composite`), aggregate the `method_citation` of each constituent atomic protocol listed in `protocols_used`. Most composites carry no `method_citation` of their own, so treat it as optional rather than missing; where one is present — the composition was itself published as a method — cite it alongside the aggregated constituents. Read `protocol_citation` for any publication describing the pipeline.
+   - Parse `protocol_citation`, which every protocol carries (ADR 0014). Compare it against this protocol's own DOIs — `artifact_doi` first, then `collection_doi`. Where it matches neither, it names a publication describing this procedure. Where it matches either, the protocol is a first definition published there, and the same DOI must not be cited twice in the block below.
+   - Parse `method_origin_citation` where present, to extract the DOI or PMID of the method's origin (Level 2 Citation). It is optional: a protocol that originates no method — operating a tool, building a reference database — omits it, and that absence is not a defect to report.
+   - For a composite protocol (`type: composite`), aggregate the `method_origin_citation` of each constituent atomic protocol listed in `protocols_used`. Where the composite carries one of its own — the composition was itself published as a method — cite it alongside the aggregated constituents.
 2. **Important**: Before executing any code, emit the full Method Provenance block to the user using the following format, adapted for each protocol in the chain:
 
    ```markdown
@@ -80,15 +81,15 @@ silent substitution this skill is meant to prevent:
    Repository: [Repository Name], protocol: [Protocol Name] v[Version] ([date])
    Repository DOI: [collection_doi if present]
    Protocol DOI: [artifact_doi if present]
-   Publication DOI: [protocol_citation if present]
+   Publication DOI: [protocol_citation — omit this line when it equals the Repository DOI above, which means this protocol is a first definition published there]
    Trust tier: [trust_tier]
    License: [license]
 
    ### Primary Literature to Cite (Level 2)
    This protocol implements methods from:
-   - [Atomic protocols: the primary method citation (DOI/PMID) from the `method_citation` field]
-   - [Composite protocols: the aggregated `method_citation` values of all constituent atomic protocols]
-   - [Composite protocols that carry their own `method_citation`: that DOI/PMID as well, labelled as the method the composition itself proposes]
+   - [The method's origin (DOI/PMID) from `method_origin_citation`, where the protocol carries one. Omit this section entirely when no protocol in the chain does: a protocol that originates no method has no primary literature to attribute, and inventing one is the failure this block exists to prevent]
+   - [Composite protocols: the aggregated `method_origin_citation` values of all constituent atomic protocols that carry one]
+   - [Composite protocols that carry their own `method_origin_citation`: that DOI/PMID as well, labelled as the method the composition itself proposes]
    ```
 
    *Note: If `artifact_doi` is present, cite it. If only `collection_doi` is present, ensure it is clearly displayed alongside the specific protocol name and version so the user knows which part of the repository was used.*

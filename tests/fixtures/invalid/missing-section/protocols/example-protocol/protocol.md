@@ -9,7 +9,8 @@ date: 2026-03-01
 status: draft
 license: CC-BY-4.0
 type: atomic
-method_citation: "10.1000/example"
+method_origin_citation: "10.1000/example"
+protocol_citation: "10.1000/example-procedure"
 protocols_used: []
 key_packages: []
 category: example

@@ -17,5 +17,6 @@ This directory contains Architecture Decision Records (ADRs) for the `agent-prot
 - [0011. Pre-release Tags for the Tooling](0011-pre-release-tags-for-the-tooling.md) — settles a question deferred by 0009
 - [0012. Require Materials, Steps, and a Resolvable Citation](0012-require-materials-steps-and-a-resolvable-citation.md)
 - [0013. `stable` Is an Assertion by the Authors](0013-stable-is-an-assertion-by-the-authors.md)
+- [0014. Ask Two Citation Questions, and Require the Answerable One](0014-two-citation-questions.md) — amends 0009 and 0012
 
 

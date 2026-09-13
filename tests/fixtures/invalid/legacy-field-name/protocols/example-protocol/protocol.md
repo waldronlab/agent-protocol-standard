@@ -17,6 +17,7 @@ reviews:
     status: approved
 date: 2026-03-01
 status: draft
+protocol_citation: "10.1000/example-procedure"
 license: CC-BY-4.0
 type: atomic
 citation: "10.1000/example"

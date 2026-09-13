@@ -11,9 +11,13 @@ itself needs to change, open an issue there rather than working around it here.
 
 1. Create `protocols/<name>/protocol.md`. The directory name must exactly match the `name` field in
    the YAML frontmatter.
-2. Fill in the required frontmatter — `name`, `description`, `version`, `authors`, `date`, `status` —
-   and the provenance fields that apply. An atomic protocol carries exactly one `method_citation` naming the
-   primary literature where the method was published.
+2. Fill in the required frontmatter — `name`, `description`, `version`, `authors`, `date`, `status`,
+   `protocol_citation` — and the provenance fields that apply. `protocol_citation` answers *who published
+   these instructions*: normally the paper you transcribed the procedure from. Only where no publication
+   describes it — a genuine first definition, which is rare — name this protocol's own DOI instead
+   (`artifact_doi`, else `collection_doi`). Add
+   `method_origin_citation` — *who invented the method* — only where the protocol performs a method
+   somebody proposed; omit it where it does not, such as a protocol for building a reference database.
 3. End the file with a `## History & Reviews` section. A first release has one version entry, a
    `#### Changes` bullet list, and `*No reviews yet.*` under `#### Reviews`; omit the `reviews:`
    frontmatter field entirely until someone has actually reviewed it.

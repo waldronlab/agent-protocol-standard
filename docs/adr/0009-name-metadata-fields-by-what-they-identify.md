@@ -8,6 +8,8 @@
 
 > **Corrected by [ADR-0010](0010-composites-may-carry-a-method-citation.md) (2026-09-12).** The claim below that a composite has no `method_citation` is wrong — a sequence of methods can itself be published as a method. The rename this ADR records is unaffected.
 
+> **Amended by [ADR-0014](0014-two-citation-questions.md) (2026-09-13).** `method_citation` below is renamed `method_origin_citation` and is no longer required; `protocol_citation` is now the required field. The decisions recorded here otherwise stand; the names are preserved as written for the historical record.
+
 ## Context and Problem Statement
 
 ADR 0001 established a four-field DOI taxonomy: `protocol_doi` for the artifact, `repository_doi` for the
