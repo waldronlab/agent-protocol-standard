@@ -3,7 +3,7 @@ import sys
 import os
 import yaml
 from pathlib import Path
-from datetime import datetime
+from datetime import UTC, datetime
 
 # Make sure scripts directory is in path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -63,7 +63,7 @@ def main():
     index = {
         'spec_version': '0.1.0',
         'repository': repository_name,
-        'generated_at': datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        'generated_at': datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         'protocols': protocols_list
     }
     
