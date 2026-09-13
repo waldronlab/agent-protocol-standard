@@ -47,8 +47,13 @@ Each field answers one question, stated on its own rather than against the other
 `artifact_doi` where one exists, otherwise `collection_doi`. This is the normal case for a protocol written
 here rather than transcribed, and it makes first definition a claim rather than an absence:
 
-- `protocol_citation` ≠ `collection_doi` — an external publication describes this procedure.
-- `protocol_citation` = `collection_doi` — a first definition, published here.
+- `protocol_citation` matches neither of the protocol's own DOIs — an external publication describes this
+  procedure.
+- `protocol_citation` equals the protocol's own DOI — `artifact_doi` where it has one, otherwise `collection_doi` — a first definition, published here.
+
+A collection with no DOI cannot host a first definition: there is nothing to cite. Deposit it first. That
+is a deliberate consequence rather than an oversight — a repository claiming to hold citable protocols
+should be citable itself.
 
 An absent field conflates "first definition" with "nobody filled it in". A required field separates them,
 and CI can check the answer is one of the two legal shapes.

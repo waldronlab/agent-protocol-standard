@@ -107,7 +107,9 @@ for (case in cases("invalid")) {
 # cannot do for them — and pinning the message still catches a template that has otherwise drifted
 # from the standard, which is what this check was always for.
 template_protocols <- file.path(tests_dir, "..", "template", "protocols")
-template_expected <- "is still the template placeholder"
+# Names the field, not just the placeholder text: filtering on the placeholder alone would silently
+# accept a second field carrying the same value, which is how the starter briefly failed twice.
+template_expected <- "'protocol_citation' is still the template placeholder"
 if (!dir.exists(template_protocols)) {
   cat("  [FAIL] template: no template/protocols directory\n")
   failures <- c(failures, "template")

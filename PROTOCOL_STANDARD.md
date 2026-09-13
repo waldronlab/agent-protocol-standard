@@ -23,7 +23,7 @@ Protocols follow a modular two-tier design:
 
 1. **Atomic Protocols**:
    * Implement a single, focused methodological operation.
-   * **Strictly 1 `method_origin_citation`:** A single DOI/PMID naming the primary literature where the method was originally published — the paper that *proposed* it, not one that applied it.
+   * **At most 1 `method_origin_citation`:** A single DOI/PMID naming the primary literature where the method was originally published — the paper that *proposed* it, not one that applied it. Omitted where the protocol originates no method; see [The two citation fields](#the-two-citation-fields).
    * Do not compose other protocols (`protocols_used: []`).
 2. **Composite Protocols**:
    * Implement multi-step workflows or end-to-end pipelines by composing atomic protocols.
@@ -43,11 +43,20 @@ Each answers one question. Answer them separately; do not define them against ea
 That is the normal case for a protocol written here rather than transcribed from a paper, and it is a
 claim rather than a gap:
 
-*   `protocol_citation` ≠ `collection_doi` — an external publication describes this procedure.
-*   `protocol_citation` = `collection_doi` — **a first definition, published here.**
+Compare against whichever DOI the protocol actually has — the protocol's own DOI — `artifact_doi` where it has one, otherwise `collection_doi`:
+
+*   `protocol_citation` matches neither of this protocol's own DOIs — an external publication describes
+    this procedure.
+*   `protocol_citation` equals this protocol's own DOI — **a first definition, published here.**
 
 An absent field could mean either of those, or that nobody filled it in. Requiring the field forces the
-distinction to be stated, and CI can check the answer is one of the two legal shapes.
+distinction to be stated, and CI can check the answer is a resolvable identifier.
+
+**A collection with no DOI cannot yet host a first definition.** There is nothing for such a protocol to
+cite: the procedure is unpublished and so is the collection. Deposit the collection — Zenodo mints a DOI
+from a GitHub release — and write that DOI into `collection_doi`. Until then, only protocols transcribed
+from an existing publication can conform. This is a deliberate consequence: a repository claiming to hold
+citable protocols should be citable itself.
 
 Use the **concept** DOI rather than a version DOI. A version DOI names the exact bytes, which sounds
 more precise, but it cannot be written into a protocol before the release that mints it exists. Name,
@@ -289,8 +298,8 @@ license: CC-BY-4.0
 type: atomic
 
 artifact_doi: ~
-collection_doi: ~
-protocol_citation: ~
+collection_doi: "10.5281/zenodo.0000000"
+protocol_citation: "10.7554/eLife.65088"
 
 method_origin_citation: "10.1016/j.cell.2019.01.001"
 

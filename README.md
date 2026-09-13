@@ -43,7 +43,7 @@ content node: the two workflows, a README and CONTRIBUTING that name this standa
 on format, and a starter protocol at `protocols/example-protocol/protocol.md` to rename and edit.
 
 The starter conforms in every respect but one: its `method_origin_citation` is the placeholder
-`10.0000/replace-with-a-real-doi`, which the validator rejects by name. **Your first CI run is red
+`10.0000/replace-with-a-real-doi` in the required `protocol_citation`, which the validator rejects by name. **Your first CI run is red
 until you replace it**, deliberately — a real citation is the one thing the template cannot supply,
 and it is DOI-shaped, so nothing but naming it would catch a template copied as-is. This
 repository's own test suite asserts the starter fails on exactly that and nothing else, so it still

@@ -38,6 +38,7 @@ scalar_fields <- list(
   version         = NULL,
   date            = NULL,
   status          = "status: draft",
+  protocol_citation = 'protocol_citation: "10.1000/example-procedure"',
   type            = "type: atomic",
   method_origin_citation = 'method_origin_citation: "10.1000/example"'
 )

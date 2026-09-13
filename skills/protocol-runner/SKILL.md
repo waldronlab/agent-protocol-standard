@@ -68,7 +68,7 @@ silent substitution this skill is meant to prevent:
 
 1. For each protocol in the execution chain (dependencies first, then the main protocol):
    - Fetch the markdown content using the `protocol_url` specified in the index.
-   - Parse `protocol_citation`, which every protocol carries (ADR 0014). Where it differs from `collection_doi` it names a publication describing this procedure; where it equals `collection_doi` the protocol is a first definition published in that collection, and the two should not be cited twice.
+   - Parse `protocol_citation`, which every protocol carries (ADR 0014). Compare it against this protocol's own DOIs — `artifact_doi` first, then `collection_doi`. Where it matches neither, it names a publication describing this procedure. Where it matches either, the protocol is a first definition published there, and the same DOI must not be cited twice in the block below.
    - Parse `method_origin_citation` where present, to extract the DOI or PMID of the method's origin (Level 2 Citation). It is optional: a protocol that originates no method — operating a tool, building a reference database — omits it, and that absence is not a defect to report.
    - For a composite protocol (`type: composite`), aggregate the `method_origin_citation` of each constituent atomic protocol listed in `protocols_used`. Where the composite carries one of its own — the composition was itself published as a method — cite it alongside the aggregated constituents.
 2. **Important**: Before executing any code, emit the full Method Provenance block to the user using the following format, adapted for each protocol in the chain:

@@ -18,10 +18,10 @@ type: atomic                      # atomic | composite
 # `collection_doi`. Repeating `collection_doi` here is how a protocol says "published here, by us".
 protocol_citation: "10.0000/replace-with-a-real-doi"
 
-# OPTIONAL. Who invented the method? Name the primary literature where it was FIRST PROPOSED — not a
-# paper that applies an already-established method. Omit this line entirely if the protocol
-# originates no method: documenting how to operate a tool is not a method someone proposed.
-method_origin_citation: "10.0000/replace-with-a-real-doi"
+# OPTIONAL. Who invented the method? Uncomment and name the primary literature where it was FIRST
+# PROPOSED — not a paper that applies an already-established method. Leave it out entirely if the
+# protocol originates no method: documenting how to operate a tool is not a method someone proposed.
+# method_origin_citation: "10.1000/xyz"
 
 # DOIs identifying this document and the collection housing it, if they exist. Delete if not.
 artifact_doi: ~
