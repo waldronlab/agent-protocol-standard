@@ -1,16 +1,9 @@
 name: Tooling
 
-# No paths filter. The fixtures under tests/ encode the rules in PROTOCOL_STANDARD.md, so a change
-# to the standard is exactly when they should run — and an allowlist has to be updated every time a
-# directory is added, which has already been missed twice. The suite takes under a minute.
 on:
   pull_request:
 
 jobs:
-  # The composite action is this repository's product, so CI exercises it the way a content
-  # repository does — resolving GITHUB_ACTION_PATH, installing its own dependencies — rather than
-  # only calling the script underneath it. With protocols/ gone, a conforming fixture is what it
-  # runs against.
   action:
     runs-on: ubuntu-latest
     steps:
@@ -24,15 +17,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up R
-        uses: r-lib/actions/setup-r@v2
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          r-version: 'release'
-          use-public-rspm: true
+          python-version: '3.11'
 
       - name: Install dependencies
-        run: install.packages(c("rmarkdown", "yaml"))
-        shell: Rscript {0}
+        run: pip install pydantic pyyaml pytest
 
       - name: Run validator test suite
-        run: Rscript tests/run-tests.R
+        run: pytest tests/
