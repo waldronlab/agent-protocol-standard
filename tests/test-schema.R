@@ -92,40 +92,41 @@ remove_line <- function(lines, pattern) {
   lines[-idx[1]]
 }
 
-remove_block <- function(lines, start_pattern, end_pattern, include_start = FALSE) {
+#' Remove a deterministic block between repeated anchors.
+#'
+#' The helper pairs the earliest `end_pattern` occurrence that has any preceding
+#' `start_pattern` with that end's nearest preceding `start_pattern`, then removes
+#' from `start_pattern` to `end_pattern` according to `remove_start` and `remove_end`.
+#' Defaults remove the interior plus end marker while keeping the start marker.
+#' Both patterns are exact single-line matches; `""` is intentionally used as a
+#' blank-line section delimiter in some fixture transforms.
+remove_block <- function(lines, start_pattern, end_pattern, remove_start = FALSE, remove_end = TRUE) {
   start_idx <- which(lines == start_pattern)
   if (length(start_idx) == 0) stop(paste("Start pattern not found:", start_pattern))
   end_idx <- which(lines == end_pattern)
   if (length(end_idx) == 0) stop(paste("End pattern not found:", end_pattern))
   best_start <- NA_integer_
   best_end <- NA_integer_
-  best_span <- Inf
-  for (s in start_idx) {
-    valid_end <- end_idx[end_idx > s]
-    if (length(valid_end) == 0) next
-    e <- valid_end[1]
-    span <- e - s
-    if (span < best_span) {
-      best_span <- span
-      best_start <- s
-      best_end <- e
-    }
+  for (e in end_idx) {
+    valid_start <- start_idx[start_idx < e]
+    if (length(valid_start) == 0) next
+    best_start <- valid_start[length(valid_start)]
+    best_end <- e
+    break
   }
-  if (is.infinite(best_span)) {
+  if (is.na(best_start) || is.na(best_end)) {
     stop(paste("No end pattern found after start pattern:", start_pattern, "->", end_pattern))
   }
-  drop_from <- if (include_start) best_start else (best_start + 1L)
-  if (drop_from > best_end) return(lines)
-  lines[-(drop_from:best_end)]
-}
-
-replace_block <- function(lines, start_pattern, end_pattern, replacement) {
-  start_idx <- which(lines == start_pattern)
-  if (length(start_idx) == 0) stop(paste("Start pattern not found:", start_pattern))
-  end_idx <- which(lines == end_pattern)
-  if (length(end_idx) == 0) stop(paste("End pattern not found:", end_pattern))
-  end_idx <- end_idx[end_idx > start_idx[1]][1]
-  c(lines[1:(start_idx[1]-1)], replacement, if (end_idx < length(lines)) lines[(end_idx+1):length(lines)] else character(0))
+  remove_idx <- integer(0)
+  interior_from <- best_start + 1L
+  interior_to <- best_end - 1L
+  if (interior_from <= interior_to) {
+    remove_idx <- c(remove_idx, interior_from:interior_to)
+  }
+  if (remove_start) remove_idx <- c(remove_idx, best_start)
+  if (remove_end) remove_idx <- c(remove_idx, best_end)
+  if (length(remove_idx) == 0) return(lines)
+  lines[-sort(unique(remove_idx))]
 }
 
 insert_after <- function(lines, pattern, insert) {
@@ -150,6 +151,32 @@ run_case <- function(name, files, expected = NULL) {
   }
 }
 
+# helper behavior checks
+local({
+  check("helpers/replace-line-multiline",
+        identical(replace_line(c("a", "b", "c"), "b", c("x", "y")), c("a", "x", "y", "c")))
+
+  block <- c("A", "start", "middle", "end", "Z")
+  check("helpers/remove-block-default",
+        identical(remove_block(block, "start", "end"), c("A", "start", "Z")))
+  check("helpers/remove-block-keep-end",
+        identical(remove_block(block, "start", "end", remove_end = FALSE), c("A", "start", "end", "Z")))
+  check("helpers/remove-block-include-start",
+        identical(remove_block(block, "start", "end", remove_start = TRUE), c("A", "Z")))
+  check("helpers/remove-block-include-start-keep-end",
+        identical(remove_block(block, "start", "end", remove_start = TRUE, remove_end = FALSE), c("A", "end", "Z")))
+
+  repeated <- c("S", "x", "S", "y", "E", "z", "E")
+  check("helpers/remove-block-repeated-anchors",
+        identical(remove_block(repeated, "S", "E"), c("S", "x", "z", "E")))
+
+  adjacent <- c("A", "start", "end", "Z")
+  check("helpers/remove-block-adjacent-noop",
+        identical(remove_block(adjacent, "start", "end", remove_end = FALSE), adjacent))
+  check("helpers/remove-block-adjacent-remove-start",
+        identical(remove_block(adjacent, "start", "end", remove_start = TRUE, remove_end = FALSE), c("A", "end", "Z")))
+})
+
 # valid/basic
 local({
   files <- list()
@@ -170,22 +197,35 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- replace_block(lines, "### Version 1.1.0 (2026-03-01)", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", c("### Version 1.0.0 (2026-01-15)", "", "#### Changes", "- Initial protocol creation.", "", "#### Reviews", "*No reviews yet.*"))
-  lines <- replace_block(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.", c("Run `example-tool --input reads.fastq`."))
-  lines <- replace_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.", c("The dependency target for `example-composite`."))
+  lines <- remove_block(lines, "#### Reviews", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", remove_end = FALSE)
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "#### Reviews", "*No reviews yet.*")
+  lines <- remove_block(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("Run `example-tool --input reads.fastq`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("The dependency target for `example-composite`."))
   lines <- replace_line(lines, "# Example Protocol", c("# Example Atomic Protocol"))
-  lines <- replace_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01", c("    orcid: 0000-0002-1825-0097", "date: 2026-01-15"))
-  lines <- replace_block(lines, "name: example-protocol", "version: 1.1.0", c("name: example-atomic", "description: An atomic protocol that a composite protocol in the same repository depends on.", "version: 1.0.0"))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-atomic", "description: An atomic protocol that a composite protocol in the same repository depends on.", "version: 1.0.0"))
   files[["example-atomic"]] <- lines
   lines <- baseline
-  lines <- replace_block(lines, "### Version 1.1.0 (2026-03-01)", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", c("### Version 1.0.0 (2026-01-15)", "", "#### Changes", "- Initial protocol creation.", "", "#### Reviews", "*No reviews yet.*"))
-  lines <- replace_block(lines, "### Step 1: Run the example tool", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.", c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."))
-  lines <- replace_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.", c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."))
+  lines <- remove_block(lines, "#### Reviews", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", remove_end = FALSE)
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "#### Reviews", "*No reviews yet.*")
+  lines <- remove_block(lines, "### Step 1: Run the example tool", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "### Step 1: Run the example tool", c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."))
   lines <- replace_line(lines, "# Example Protocol", c("# Example Composite Protocol"))
-  lines <- replace_block(lines, "type: atomic", "protocols_used: []", c("type: composite", "protocols_used:", "  - name: example-atomic", "    repository: example-org/example-protocols", "    version: 1.0.0"))
+  lines <- remove_block(lines, "type: atomic", "protocols_used: []")
+  lines <- insert_after(lines, "type: atomic", c("type: composite", "protocols_used:", "  - name: example-atomic", "    repository: example-org/example-protocols", "    version: 1.0.0"))
   lines <- insert_after(lines, "status: draft", c("protocol_citation: \"10.1000/example-procedure\""))
-  lines <- replace_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01", c("    orcid: 0000-0002-1825-0097", "date: 2026-01-15"))
-  lines <- replace_block(lines, "name: example-protocol", "version: 1.1.0", c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"))
   files[["example-composite"]] <- lines
   run_case("composite", files)
 })
@@ -194,22 +234,35 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- replace_block(lines, "### Version 1.1.0 (2026-03-01)", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", c("### Version 1.0.0 (2026-01-15)", "", "#### Changes", "- Initial protocol creation.", "", "#### Reviews", "*No reviews yet.*"))
-  lines <- replace_block(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.", c("Run `example-tool --input reads.fastq`."))
-  lines <- replace_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.", c("The dependency target for `example-composite`."))
+  lines <- remove_block(lines, "#### Reviews", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", remove_end = FALSE)
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "#### Reviews", "*No reviews yet.*")
+  lines <- remove_block(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("Run `example-tool --input reads.fastq`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("The dependency target for `example-composite`."))
   lines <- replace_line(lines, "# Example Protocol", c("# Example Atomic Protocol"))
-  lines <- replace_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01", c("    orcid: 0000-0002-1825-0097", "date: 2026-01-15"))
-  lines <- replace_block(lines, "name: example-protocol", "version: 1.1.0", c("name: example-atomic", "description: An atomic protocol that a composite protocol in the same repository depends on.", "version: 1.0.0"))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-atomic", "description: An atomic protocol that a composite protocol in the same repository depends on.", "version: 1.0.0"))
   files[["example-atomic"]] <- lines
   lines <- baseline
-  lines <- replace_block(lines, "### Version 1.1.0 (2026-03-01)", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", c("### Version 1.0.0 (2026-01-15)", "", "#### Changes", "- Initial protocol creation.", "", "#### Reviews", "*No reviews yet.*"))
-  lines <- replace_block(lines, "### Step 1: Run the example tool", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.", c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."))
-  lines <- replace_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.", c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."))
+  lines <- remove_block(lines, "#### Reviews", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", remove_end = FALSE)
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "#### Reviews", "*No reviews yet.*")
+  lines <- remove_block(lines, "### Step 1: Run the example tool", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "### Step 1: Run the example tool", c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."))
   lines <- replace_line(lines, "# Example Protocol", c("# Example Composite Protocol"))
   lines <- replace_line(lines, "protocols_used: []", c("protocols_used:", "  - name: example-atomic", "    repository: example-org/example-protocols", "    version: 1.0.0"))
-  lines <- replace_block(lines, "type: atomic", "method_origin_citation: \"10.1000/example\"", c("type: composite", "# A sequence of methods can itself be published as a method; this is permitted.", "method_origin_citation: \"10.1000/example-pipeline\""))
-  lines <- replace_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01", c("    orcid: 0000-0002-1825-0097", "date: 2026-01-15"))
-  lines <- replace_block(lines, "name: example-protocol", "version: 1.1.0", c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"))
+  lines <- remove_block(lines, "type: atomic", "method_origin_citation: \"10.1000/example\"")
+  lines <- insert_after(lines, "type: atomic", c("type: composite", "# A sequence of methods can itself be published as a method; this is permitted.", "method_origin_citation: \"10.1000/example-pipeline\""))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"))
   files[["example-composite"]] <- lines
   run_case("composite-with-method-citation", files)
 })
@@ -218,12 +271,18 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- replace_block(lines, "### Version 1.1.0 (2026-03-01)", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", c("### Version 1.0.0 (2026-01-15)", "", "#### Changes", "- Initial protocol creation.", "", "#### Reviews", "*No reviews yet.*"))
-  lines <- replace_block(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.", c("Run `example-tool --input reads.fastq`."))
-  lines <- replace_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.", c("The pre-review case: the section is still required, only its `#### Reviews` body is a placeholder,", "and the optional `reviews:` frontmatter field is omitted entirely."))
+  lines <- remove_block(lines, "#### Reviews", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", remove_end = FALSE)
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "#### Reviews", "*No reviews yet.*")
+  lines <- remove_block(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("Run `example-tool --input reads.fastq`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("The pre-review case: the section is still required, only its `#### Reviews` body is a placeholder,", "and the optional `reviews:` frontmatter field is omitted entirely."))
   lines <- replace_line(lines, "# Example Protocol", c("# Example First Release"))
-  lines <- replace_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01", c("    orcid: 0000-0002-1825-0097", "date: 2026-01-15"))
-  lines <- replace_block(lines, "name: example-protocol", "version: 1.1.0", c("name: example-first-release", "description: A first release that nobody has reviewed yet, with no 'reviews' frontmatter field.", "version: 1.0.0"))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-first-release", "description: A first release that nobody has reviewed yet, with no 'reviews' frontmatter field.", "version: 1.0.0"))
   files[["example-first-release"]] <- lines
   run_case("first-release", files)
 })
@@ -242,7 +301,8 @@ local({
   files <- list()
   lines <- baseline
   lines <- replace_line(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("A first definition: protocol_citation repeats collection_doi, and no method origin is claimed, exercising two releases, a reviewed older version, an unreviewed"))
-  lines <- replace_block(lines, "method_origin_citation: \"10.1000/example\"", "protocol_citation: \"10.1000/example-procedure\"", c("protocol_citation: \"10.5281/zenodo.9999999\""))
+  lines <- remove_block(lines, "method_origin_citation: \"10.1000/example\"", "protocol_citation: \"10.1000/example-procedure\"")
+  lines <- insert_after(lines, "method_origin_citation: \"10.1000/example\"", c("protocol_citation: \"10.5281/zenodo.9999999\""))
   lines <- insert_after(lines, "license: CC-BY-4.0", c("collection_doi: \"10.5281/zenodo.9999999\""))
   lines <- replace_line(lines, "description: A minimal conforming protocol used as a fixture for the validator test suite.", c("description: A first definition — protocol_citation repeats collection_doi, and no method origin is claimed."))
   files[["example-protocol"]] <- lines
@@ -264,7 +324,7 @@ local({
   files <- list()
   lines <- baseline
   lines <- insert_after(lines, "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", c("", "### Version 1.1.0 (2026-03-01)", "", "#### Changes", "- Made the output path of Step 1 explicit.", "", "#### Reviews", "*No reviews yet.*"))
-  lines <- remove_block(lines, "### Version 1.1.0 (2026-03-01)", "", include_start = TRUE)
+  lines <- remove_block(lines, "### Version 1.1.0 (2026-03-01)", "", remove_start = TRUE)
   lines <- replace_line(lines, "date: 2026-03-01", c("date: 2026-01-15"))
   lines <- replace_line(lines, "version: 1.1.0", c("version: 1.0.0"))
   files[["example-protocol"]] <- lines
@@ -332,7 +392,7 @@ local({
   lines <- baseline
   lines <- insert_after(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("```"))
   lines <- insert_after(lines, "", c("```not-a-close", ""))
-  lines <- insert_after(lines, "  - `example-tool` (https://example.org/example-tool) — version 1.0.", c("Example layout:", "", "```markdown"))
+  lines <- insert_after(lines, "", c("Example layout:", "", "```markdown"))
   files[["example-protocol"]] <- lines
   run_case("fence-close-with-suffix", files, "Missing required '## Steps' section")
 })
@@ -369,7 +429,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- replace_block(lines, "method_origin_citation: \"10.1000/example\"", "protocol_citation: \"10.1000/example-procedure\"", c("citation: \"10.1000/example\""))
+  lines <- remove_block(lines, "method_origin_citation: \"10.1000/example\"", "protocol_citation: \"10.1000/example-procedure\"")
+  lines <- insert_after(lines, "method_origin_citation: \"10.1000/example\"", c("citation: \"10.1000/example\""))
   lines <- insert_after(lines, "status: draft", c("protocol_citation: \"10.1000/example-procedure\""))
   files[["example-protocol"]] <- lines
   run_case("legacy-field-name", files, "Field 'citation' was renamed to 'method_origin_citation' (see PROTOCOL_STANDARD.md) in 'example-protocol'")
@@ -416,14 +477,21 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- replace_block(lines, "### Version 1.1.0 (2026-03-01)", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", c("### Version 1.0.0 (2026-01-15)", "", "#### Changes", "- Initial protocol creation.", "", "#### Reviews", "*No reviews yet.*"))
-  lines <- replace_block(lines, "### Step 1: Run the example tool", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.", c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."))
-  lines <- replace_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.", c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."))
+  lines <- remove_block(lines, "#### Reviews", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", remove_end = FALSE)
+  lines <- insert_after(lines, "", c("*No reviews yet.*"))
+  lines <- remove_block(lines, "#### Reviews", "*No reviews yet.*")
+  lines <- remove_block(lines, "### Step 1: Run the example tool", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.")
+  lines <- insert_after(lines, "### Step 1: Run the example tool", c("### Step 1: Run the atomic protocol", "Execute `example-atomic`."))
+  lines <- remove_block(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", "current version, and a reviewer with and without an ORCID.")
+  lines <- insert_after(lines, "A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed", c("Exercises the local-dependency check, which resolves `repository:` against the repository the", "validator is running in."))
   lines <- replace_line(lines, "# Example Protocol", c("# Example Composite Protocol"))
-  lines <- replace_block(lines, "type: atomic", "protocols_used: []", c("type: composite", "protocols_used:", "  - name: example-atomic", "    repository: example-org/example-protocols", "    version: 1.0.0"))
+  lines <- remove_block(lines, "type: atomic", "protocols_used: []")
+  lines <- insert_after(lines, "type: atomic", c("type: composite", "protocols_used:", "  - name: example-atomic", "    repository: example-org/example-protocols", "    version: 1.0.0"))
   lines <- insert_after(lines, "status: draft", c("protocol_citation: \"10.1000/example-procedure\""))
-  lines <- replace_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01", c("    orcid: 0000-0002-1825-0097", "date: 2026-01-15"))
-  lines <- replace_block(lines, "name: example-protocol", "version: 1.1.0", c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"))
+  lines <- remove_block(lines, "    orcid: 0000-0002-1825-0097", "date: 2026-03-01")
+  lines <- insert_after(lines, "    orcid: 0000-0002-1825-0097", c("date: 2026-01-15"))
+  lines <- remove_block(lines, "name: example-protocol", "version: 1.1.0")
+  lines <- insert_after(lines, "name: example-protocol", c("name: example-composite", "description: A composite protocol whose dependency lives in this same repository.", "version: 1.0.0"))
   files[["example-composite"]] <- lines
   run_case("missing-local-dependency", files, "Dependent protocol 'example-atomic' not found at")
 })
@@ -432,7 +500,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- remove_block(lines, "", "  - `example-tool` (https://example.org/example-tool) — version 1.0.")
+  lines <- remove_block(lines, "- **Software & Repositories:**", "  - `example-tool` (https://example.org/example-tool) — version 1.0.")
   files[["example-protocol"]] <- lines
   run_case("missing-materials", files, "Missing required '## Materials' section")
 })
@@ -452,8 +520,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- remove_block(lines, "", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.")
-  lines <- remove_block(lines, "reviews:", "    status: approved", include_start = TRUE)
+  lines <- remove_block(lines, "#### Reviews", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", remove_end = FALSE)
+  lines <- remove_block(lines, "reviews:", "    status: approved", remove_start = TRUE)
   files[["example-protocol"]] <- lines
   run_case("missing-section", files, "Missing required '## History & Reviews' section")
 })
@@ -471,7 +539,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- remove_block(lines, "## Steps", "", include_start = TRUE)
+  lines <- remove_block(lines, "## Steps", "", remove_start = TRUE)
   files[["example-protocol"]] <- lines
   run_case("missing-steps", files, "Missing required '## Steps' section")
 })
@@ -547,7 +615,7 @@ local({
   files <- list()
   lines <- baseline
   lines <- replace_line(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("```"))
-  lines <- insert_after(lines, "current version, and a reviewer with and without an ORCID.", c("A protocol is laid out like this:", "", "```markdown"))
+  lines <- insert_after(lines, "", c("A protocol is laid out like this:", "", "```markdown"))
   files[["example-protocol"]] <- lines
   run_case("sections-only-in-code-fence", files, "Missing required '## Materials' section")
 })
@@ -556,7 +624,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- replace_block(lines, "## Steps", "This protocol exists only to exercise `scripts/validate-protocol.R`. It is not a real method.", c("### Step 1: Run the example tool", "Run `example-tool --input reads.fastq --output counts.tsv`.", "", "## Steps", ""))
+  lines <- remove_block(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", "## Notes")
+  lines <- insert_after(lines, "", c("The steps are described below.", "", "## Notes", ""))
   files[["example-protocol"]] <- lines
   run_case("step-heading-outside-steps", files, "'## Steps' contains no '### Step' heading")
 })
@@ -566,7 +635,7 @@ local({
   files <- list()
   lines <- baseline
   lines <- insert_after(lines, "Run `example-tool --input reads.fastq --output counts.tsv`.", c("```"))
-  lines <- insert_after(lines, "  - `example-tool` (https://example.org/example-tool) — version 1.0.", c("Example layout:", "", "```markdown"))
+  lines <- insert_after(lines, "", c("Example layout:", "", "```markdown"))
   files[["example-protocol"]] <- lines
   run_case("steps-only-in-code-fence", files, "Missing required '## Steps' section")
 })
@@ -602,7 +671,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines[which(lines == "    protocol_version: 1.0.0")[2]] <- "    protocol_version: 0.9.0"
+  lines <- replace_line(lines, "    protocol_version: 1.0.0", c("    protocol_version: 0.9.0"))
   files[["example-protocol"]] <- lines
   run_case("unknown-protocol-version", files, "Review by 'Alan Turing' declares protocol_version '0.9.0', which has no matching entry in '## History & Reviews'")
 })
