@@ -1,1 +1,0 @@
-Field 'repository_doi' was renamed to 'collection_doi' (see PROTOCOL_STANDARD.md) in 'example-protocol'

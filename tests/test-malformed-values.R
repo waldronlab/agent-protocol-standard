@@ -43,8 +43,8 @@ scalar_fields <- list(
   method_origin_citation = 'method_origin_citation: "10.1000/example"'
 )
 
-template_path <- file.path(fixtures_dir, "valid", "basic", "protocols", "example-protocol", "protocol.md")
-template <- readLines(template_path, warn = FALSE)
+template_path <- file.path(tempdir(), "malformed-template.md"); writeLines(baseline, template_path)
+template <- baseline
 for (field in names(scalar_fields)) {
   if (is.null(scalar_fields[[field]])) {
     hit <- grep(sprintf("^%s:", field), template, value = TRUE)

@@ -1,1 +1,0 @@
-Top entry in '## History & Reviews' is dated '2026-03-01', but frontmatter declares date '2026-03-02'

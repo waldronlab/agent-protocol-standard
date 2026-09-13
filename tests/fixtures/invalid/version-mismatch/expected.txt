@@ -1,1 +1,0 @@
-Top entry in '## History & Reviews' is version '1.1.0', but frontmatter declares version '1.2.0'

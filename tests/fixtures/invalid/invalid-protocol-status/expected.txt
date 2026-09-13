@@ -1,1 +1,0 @@
-'status' must be one of 'draft', 'stable', 'deprecated', 'superseded'

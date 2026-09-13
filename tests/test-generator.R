@@ -25,8 +25,8 @@ run_generator <- function(wd, args = c("protocols", "PROTOCOLS.yaml"), env = cha
 work <- file.path(tempdir(), "generator-roundtrip")
 unlink(work, recursive = TRUE)
 dir.create(file.path(work, "protocols"), recursive = TRUE, showWarnings = FALSE)
-file.copy(file.path(fixtures_dir, "valid", "basic", "protocols", "example-protocol"),
-          file.path(work, "protocols"), recursive = TRUE)
+dir.create(file.path(work, "protocols", "example-protocol"), recursive = TRUE)
+writeLines(baseline, file.path(work, "protocols", "example-protocol", "protocol.md"))
 
 result <- run_generator(work, env = c("GITHUB_REPOSITORY=some-org/some-repo",
                                       "GITHUB_EVENT_NAME=push",
@@ -90,8 +90,8 @@ check("generator refuses to write an index when the protocols directory is missi
 malformed <- file.path(tempdir(), "generator-malformed")
 unlink(malformed, recursive = TRUE)
 dir.create(file.path(malformed, "protocols", "broken"), recursive = TRUE, showWarnings = FALSE)
-file.copy(file.path(fixtures_dir, "valid", "basic", "protocols", "example-protocol"),
-          file.path(malformed, "protocols"), recursive = TRUE)
+dir.create(file.path(malformed, "protocols", "example-protocol"), recursive = TRUE)
+writeLines(baseline, file.path(malformed, "protocols", "example-protocol", "protocol.md"))
 writeLines(c("---", "name: broken", "  bad: [unclosed", "---", "", "# Broken"),
            file.path(malformed, "protocols", "broken", "protocol.md"))
 result <- run_generator(malformed, env = "GITHUB_REPOSITORY=some-org/some-repo")
@@ -106,8 +106,8 @@ check("generator refuses to write an index that silently omits an unreadable pro
 undetectable <- file.path(tempdir(), "generator-undetectable")
 unlink(undetectable, recursive = TRUE)
 dir.create(file.path(undetectable, "protocols"), recursive = TRUE, showWarnings = FALSE)
-file.copy(file.path(fixtures_dir, "valid", "basic", "protocols", "example-protocol"),
-          file.path(undetectable, "protocols"), recursive = TRUE)
+dir.create(file.path(undetectable, "protocols", "example-protocol"), recursive = TRUE)
+writeLines(baseline, file.path(undetectable, "protocols", "example-protocol", "protocol.md"))
 result <- run_generator(undetectable, env = "GITHUB_REPOSITORY=")
 check("generator stops, writing nothing, when the repository cannot be determined",
       result$status != 0 &&

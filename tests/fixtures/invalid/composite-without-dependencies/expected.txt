@@ -1,1 +1,0 @@
-'type: composite' requires a non-empty 'protocols_used'

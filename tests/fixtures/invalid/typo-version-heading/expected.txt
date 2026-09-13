@@ -1,1 +1,0 @@
-Malformed version heading '### Verson 1.0.0 (2026-01-15)'; expected '### Version X.Y.Z (YYYY-MM-DD)'

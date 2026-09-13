@@ -1,1 +1,0 @@
-'type: atomic' cannot declare 'protocols_used'

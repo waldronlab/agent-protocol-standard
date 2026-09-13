@@ -63,42 +63,7 @@ check <- function(label, ok, detail = NULL) {
   }
 }
 
-for (case in cases("valid")) {
-  path <- file.path(fixtures_dir, "valid", case, "protocols")
-  result <- run_validator(path)
-  if (result$status == 0) {
-    cat(sprintf("  [PASS] valid/%s\n", case))
-    passed <- passed + 1L
-  } else {
-    cat(sprintf("  [FAIL] valid/%s: expected to pass, but the validator exited %d\n%s\n",
-                case, result$status, result$output))
-    failures <- c(failures, sprintf("valid/%s", case))
-  }
-}
-
-for (case in cases("invalid")) {
-  path <- file.path(fixtures_dir, "invalid", case, "protocols")
-  expected_file <- file.path(fixtures_dir, "invalid", case, "expected.txt")
-  if (!file.exists(expected_file)) {
-    cat(sprintf("  [FAIL] invalid/%s: no expected.txt\n", case))
-    failures <- c(failures, sprintf("invalid/%s", case))
-    next
-  }
-  expected <- trimws(paste(readLines(expected_file, warn = FALSE), collapse = "\n"))
-  result <- run_validator(path)
-
-  if (result$status == 0) {
-    cat(sprintf("  [FAIL] invalid/%s: expected the validator to fail, but it passed\n", case))
-    failures <- c(failures, sprintf("invalid/%s", case))
-  } else if (!grepl(expected, result$output, fixed = TRUE)) {
-    cat(sprintf("  [FAIL] invalid/%s: failed as expected, but without the expected message.\n    expected: %s\n    got:\n%s\n",
-                case, expected, result$output))
-    failures <- c(failures, sprintf("invalid/%s", case))
-  } else {
-    cat(sprintf("  [PASS] invalid/%s\n", case))
-    passed <- passed + 1L
-  }
-}
+source(file.path(tests_dir, "test-schema.R"))
 
 # The starter protocol a new content repository copies must conform in every respect but one: its
 # 'method_origin_citation' is a placeholder, and the validator now rejects that exact string. So the
