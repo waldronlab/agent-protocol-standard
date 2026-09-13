@@ -72,7 +72,7 @@ def extract_frontmatter(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
     
-    match = re.match(r'^---[\r\n]+(.*?[\r\n]+)(?:---|\.\.\.)(?:[\r\n]|$)', content, re.DOTALL)
+    match = re.match(r'^---[ \t]*[\r\n]+(.*?[\r\n]+)(?:---|\.\.\.)[ \t]*(?:[\r\n]|$)', content, re.DOTALL)
     if not match:
         return None
         
@@ -295,7 +295,7 @@ def validate_history(file_path, frontmatter, frontmatter_reviews):
         return False
     return True
 
-def validate_protocol(file_path, protocols_dir):
+def validate_protocol(file_path, protocols_dir, this_repository=None):
     print(f"Validating {file_path}...")
     try:
         raw_frontmatter = extract_frontmatter(file_path)
@@ -357,7 +357,9 @@ def validate_protocol(file_path, protocols_dir):
             errors.append("'## Steps' contains no '### Step' heading; a protocol must have at least one step")
             
     if fm_model and fm_model.protocols_used:
-        this_repository = detect_repository()
+        if this_repository is None:
+            this_repository = detect_repository()
+        
         for dep in fm_model.protocols_used:
             if this_repository is None:
                 print(f"  [WARN] Cannot determine this repository, so the local availability of dependency '{dep.name}' was not checked. Set GITHUB_REPOSITORY to 'owner/name' to enable this check.")
@@ -392,7 +394,8 @@ if __name__ == '__main__':
         print(f"  [ERROR] No 'protocol.md' files found under '{protocols_dir}'.")
         sys.exit(1)
         
-    results = [validate_protocol(str(f), protocols_dir) for f in protocol_files]
+    this_repository = detect_repository()
+    results = [validate_protocol(str(f), protocols_dir, this_repository) for f in protocol_files]
     
     if not all(results):
         print("\nValidation failed for some protocols.")

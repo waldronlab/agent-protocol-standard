@@ -9,7 +9,11 @@ def test_parse_repository_url():
         "git@github.com:owner/name",
         "https://github.com/owner/name.git/",
         "https://github.com/owner/name/",
-        "http://github.com/owner/name"
+        "http://github.com/owner/name",
+        "ssh://git@github.com/owner/name.git",
+        "git@gitlab.com:owner/name.git",
+        "https://x-access-token:v1.12345@github.com/owner/name.git",
+        "  https://github.com/owner/name.git  "
     ]
     for url in valid:
         assert parse_repository_url(url) == "owner/name"
@@ -19,7 +23,8 @@ def test_parse_repository_url():
         "/tmp/protocols",
         "file:///tmp/protocols",
         "owner/name",
-        "https://github.com/owner"
+        "https://github.com/owner",
+        "https://github.com/owner/name/extra"
     ]
     for url in invalid:
         assert parse_repository_url(url) is None

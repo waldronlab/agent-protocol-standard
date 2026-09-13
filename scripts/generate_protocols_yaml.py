@@ -51,7 +51,7 @@ def main():
             
         if 'reviews' in frontmatter and isinstance(frontmatter['reviews'], list):
             for r in frontmatter['reviews']:
-                if 'date' in r and hasattr(r['date'], 'isoformat'):
+                if isinstance(r, dict) and 'date' in r and hasattr(r['date'], 'isoformat'):
                     r['date'] = r['date'].isoformat()
                     
         protocols_list.append(frontmatter)

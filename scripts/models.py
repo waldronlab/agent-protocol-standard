@@ -26,6 +26,16 @@ class Review(BaseModel):
     status: Literal['approved', 'verified-with-benchmark', 'changes-requested', 'deprecated']
     orcid: Optional[str] = None
 
+    @field_validator('date', mode='before')
+    def validate_date_format(cls, v):
+        import datetime
+        if isinstance(v, str):
+            if not re.match(r'^[0-9]{4}-[0-9]{2}-[0-9]{2}$', v):
+                raise ValueError("Must be YYYY-MM-DD string")
+        elif not isinstance(v, datetime.date) or isinstance(v, datetime.datetime):
+            raise ValueError("Must be a YYYY-MM-DD date")
+        return v
+
     @field_validator('orcid')
     def validate_orcid(cls, v):
         if v is not None and not re.match(ORCID_PATTERN, v):
@@ -61,6 +71,16 @@ class ProtocolFrontmatter(BaseModel):
 
     # We must allow extra fields only for pydantic internals or things not specified? No, Extra.forbid is usually better, but spec doesn't say forbid. Let's not forbid.
     model_config = {'extra': 'allow'}
+
+    @field_validator('date', mode='before')
+    def validate_date_format(cls, v):
+        import datetime
+        if isinstance(v, str):
+            if not re.match(r'^[0-9]{4}-[0-9]{2}-[0-9]{2}$', v):
+                raise ValueError("Must be YYYY-MM-DD string")
+        elif not isinstance(v, datetime.date) or isinstance(v, datetime.datetime):
+            raise ValueError("Must be a YYYY-MM-DD date")
+        return v
 
     @field_validator('type', mode='before')
     def reject_null_type(cls, v):
