@@ -40,8 +40,9 @@ Each answers one question. Answer them separately; do not define them against ea
 | `method_origin_citation` *(optional)* | **Who invented the method?** | Breiman 2001, for random forests |
 
 **Where no publication describes the procedure, `protocol_citation` names this protocol's own DOI.**
-That is the normal case for a protocol written here rather than transcribed from a paper, and it is a
-claim rather than a gap:
+This is the exception, and it should be rare: a protocol usually encodes a procedure someone has
+published, and that paper is the answer. Reach for self-citation only after looking for the paper and
+concluding there is none. When it does apply, it is a claim rather than a gap:
 
 Compare against whichever DOI the protocol actually has — the protocol's own DOI — `artifact_doi` where it has one, otherwise `collection_doi`:
 

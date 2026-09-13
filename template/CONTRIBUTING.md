@@ -13,8 +13,9 @@ itself needs to change, open an issue there rather than working around it here.
    the YAML frontmatter.
 2. Fill in the required frontmatter — `name`, `description`, `version`, `authors`, `date`, `status`,
    `protocol_citation` — and the provenance fields that apply. `protocol_citation` answers *who published
-   these instructions*: the paper you transcribed the procedure from, or this protocol's own DOI
-   (`artifact_doi`, else `collection_doi`) where you are writing the first definition. Add
+   these instructions*: normally the paper you transcribed the procedure from. Only where no publication
+   describes it — a genuine first definition, which is rare — name this protocol's own DOI instead
+   (`artifact_doi`, else `collection_doi`). Add
    `method_origin_citation` — *who invented the method* — only where the protocol performs a method
    somebody proposed; omit it where it does not, such as a protocol for building a reference database.
 3. End the file with a `## History & Reviews` section. A first release has one version entry, a

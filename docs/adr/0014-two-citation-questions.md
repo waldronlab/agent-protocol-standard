@@ -44,8 +44,9 @@ Each field answers one question, stated on its own rather than against the other
 | `method_origin_citation` | Who **invented the method**? |
 
 **Where no publication describes the procedure, `protocol_citation` names the protocol's own DOI** —
-`artifact_doi` where one exists, otherwise `collection_doi`. This is the normal case for a protocol written
-here rather than transcribed, and it makes first definition a claim rather than an absence:
+`artifact_doi` where one exists, otherwise `collection_doi`. This is expected to be **rare** — a protocol
+usually encodes a published procedure, and that publication is the answer — but where it applies it makes
+first definition a claim rather than an absence:
 
 - `protocol_citation` matches neither of the protocol's own DOIs — an external publication describes this
   procedure.
