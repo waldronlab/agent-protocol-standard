@@ -82,7 +82,8 @@ baseline <- c(
 replace_line <- function(lines, pattern, replacement) {
   idx <- which(lines == pattern)
   if (length(idx) == 0) stop(paste("Pattern not found:", pattern))
-  c(lines[1:(idx[1]-1)], replacement, if (idx[1] < length(lines)) lines[(idx[1]+1):length(lines)] else character(0))
+  c(lines[seq_len(idx[1] - 1)], replacement,
+    if (idx[1] < length(lines)) lines[(idx[1] + 1):length(lines)] else character(0))
 }
 
 remove_line <- function(lines, pattern) {
@@ -91,13 +92,31 @@ remove_line <- function(lines, pattern) {
   lines[-idx[1]]
 }
 
-remove_block <- function(lines, start_pattern, end_pattern) {
+remove_block <- function(lines, start_pattern, end_pattern, include_start = FALSE) {
   start_idx <- which(lines == start_pattern)
   if (length(start_idx) == 0) stop(paste("Start pattern not found:", start_pattern))
   end_idx <- which(lines == end_pattern)
   if (length(end_idx) == 0) stop(paste("End pattern not found:", end_pattern))
-  end_idx <- end_idx[end_idx > start_idx[1]][1]
-  lines[-(start_idx[1]:end_idx)]
+  best_start <- NA_integer_
+  best_end <- NA_integer_
+  best_span <- Inf
+  for (s in start_idx) {
+    valid_end <- end_idx[end_idx > s]
+    if (length(valid_end) == 0) next
+    e <- valid_end[1]
+    span <- e - s
+    if (span < best_span) {
+      best_span <- span
+      best_start <- s
+      best_end <- e
+    }
+  }
+  if (is.infinite(best_span)) {
+    stop(paste("No end pattern found after start pattern:", start_pattern, "->", end_pattern))
+  }
+  drop_from <- if (include_start) best_start else (best_start + 1L)
+  if (drop_from > best_end) return(lines)
+  lines[-(drop_from:best_end)]
 }
 
 replace_block <- function(lines, start_pattern, end_pattern, replacement) {
@@ -245,7 +264,7 @@ local({
   files <- list()
   lines <- baseline
   lines <- insert_after(lines, "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.", c("", "### Version 1.1.0 (2026-03-01)", "", "#### Changes", "- Made the output path of Step 1 explicit.", "", "#### Reviews", "*No reviews yet.*"))
-  lines <- remove_block(lines, "### Version 1.1.0 (2026-03-01)", "")
+  lines <- remove_block(lines, "### Version 1.1.0 (2026-03-01)", "", include_start = TRUE)
   lines <- replace_line(lines, "date: 2026-03-01", c("date: 2026-01-15"))
   lines <- replace_line(lines, "version: 1.1.0", c("version: 1.0.0"))
   files[["example-protocol"]] <- lines
@@ -433,8 +452,8 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- remove_block(lines, "## History & Reviews", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.")
-  lines <- remove_block(lines, "reviews:", "    status: approved")
+  lines <- remove_block(lines, "", "- **Notes:** Read for scientific soundness. The parameters in Step 1 are appropriate.")
+  lines <- remove_block(lines, "reviews:", "    status: approved", include_start = TRUE)
   files[["example-protocol"]] <- lines
   run_case("missing-section", files, "Missing required '## History & Reviews' section")
 })
@@ -452,7 +471,7 @@ local({
 local({
   files <- list()
   lines <- baseline
-  lines <- remove_block(lines, "## Steps", "")
+  lines <- remove_block(lines, "## Steps", "", include_start = TRUE)
   files[["example-protocol"]] <- lines
   run_case("missing-steps", files, "Missing required '## Steps' section")
 })
