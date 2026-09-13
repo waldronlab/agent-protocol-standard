@@ -4,15 +4,10 @@
 #
 # The whole test suite. Three parts:
 #
-#   1. scripts/validate-protocol.R against every fixture under tests/fixtures/, and against the
-#      starter protocol in template/, which new content repositories copy:
+#   1. scripts/validate-protocol.R against dynamically generated fixtures (test-schema.R),
+#      and against the starter protocol in template/, which new content repositories copy.
 #
-#        tests/fixtures/valid/<case>/protocols/<name>/protocol.md    must pass (exit 0)
-#        tests/fixtures/invalid/<case>/protocols/<name>/protocol.md  must fail (exit 1) AND print
-#                                                                    the message in expected.txt
-#
-#      To add a case, create the directory and (for an invalid case) its expected.txt; nothing here
-#      needs editing.
+#      To add a case, edit tests/test-schema.R to build a fixture inline from the baseline protocol.
 #
 #   2. tests/test-repo-utils.R  — unit tests for the repository and ref detection helpers.
 #   3. tests/test-generator.R   — the index generator's output and its refusals.
@@ -43,10 +38,7 @@ run_validator <- function(protocols_path) {
        output = paste(output, collapse = "\n"))
 }
 
-cases <- function(kind) {
-  dir <- file.path(fixtures_dir, kind)
-  sort(list.dirs(dir, recursive = FALSE, full.names = FALSE))
-}
+
 
 failures <- character(0)
 passed <- 0L
