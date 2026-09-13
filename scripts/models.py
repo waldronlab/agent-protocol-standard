@@ -62,6 +62,18 @@ class ProtocolFrontmatter(BaseModel):
     # We must allow extra fields only for pydantic internals or things not specified? No, Extra.forbid is usually better, but spec doesn't say forbid. Let's not forbid.
     model_config = {'extra': 'allow'}
 
+    @field_validator('type', mode='before')
+    def reject_null_type(cls, v):
+        if v is None:
+            raise ValueError("must be either 'atomic' or 'composite'")
+        return v
+
+    @field_validator('method_origin_citation', mode='before')
+    def reject_null_method_origin_citation(cls, v):
+        if v is None:
+            raise ValueError("must be omitted when unknown; do not set it to null")
+        return v
+
     @field_validator('name')
     def validate_name(cls, v):
         if not re.match(KEBAB_CASE_PATTERN, v):

@@ -60,3 +60,17 @@ def test_type_and_deps():
     d["protocols_used"] = []
     with pytest.raises(ValidationError):
         ProtocolFrontmatter(**d)
+
+
+def test_explicit_null_type_rejected():
+    d = valid_dict()
+    d["type"] = None
+    with pytest.raises(ValidationError):
+        ProtocolFrontmatter(**d)
+
+
+def test_explicit_null_method_origin_citation_rejected():
+    d = valid_dict()
+    d["method_origin_citation"] = None
+    with pytest.raises(ValidationError):
+        ProtocolFrontmatter(**d)

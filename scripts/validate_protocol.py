@@ -26,7 +26,7 @@ def strip_frontmatter_and_code(lines):
             
         if in_frontmatter:
             keep[i] = False
-            if re.match(r'^(---|...)[ \t]*$', line):
+            if re.match(r'^(---|\.\.\.)[ \t]*$', line):
                 in_frontmatter = False
             continue
             
@@ -368,10 +368,7 @@ def validate_protocol(file_path, protocols_dir):
     for msg in errors:
         print(f"  [ERROR] {msg} in '{display_name}'")
         
-    fm_reviews = fm_model.reviews if fm_model else raw_frontmatter.get('reviews')
-    if isinstance(fm_reviews, list) and fm_model is None:
-        # Avoid crashing if reviews failed validation but we still want to check history
-        fm_reviews = []
+    fm_reviews = fm_model.reviews if fm_model else []
         
     history_ok = validate_history(file_path, raw_frontmatter, fm_reviews)
 
