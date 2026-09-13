@@ -21,6 +21,7 @@ def test_generate_index_uses_detected_repository_ref_and_serializes_dates(tmp_pa
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
     monkeypatch.setenv("GITHUB_REF_NAME", "feature-branch")
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
     monkeypatch.setattr(
         sys, "argv", ["generate_protocols_yaml.py", "protocols", "PROTOCOLS.yaml"]
     )
@@ -49,6 +50,7 @@ def test_generate_index_refuses_to_write_when_any_protocol_is_unreadable(tmp_pat
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
     monkeypatch.setenv("GITHUB_REF_NAME", "feature-branch")
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
     monkeypatch.setattr(
         sys, "argv", ["generate_protocols_yaml.py", "protocols", "PROTOCOLS.yaml"]
     )
@@ -62,6 +64,7 @@ def test_generate_index_exits_when_protocols_dir_missing(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
     monkeypatch.setenv("GITHUB_REF_NAME", "feature-branch")
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
     monkeypatch.setattr(
         sys, "argv", ["generate_protocols_yaml.py", "protocols", "PROTOCOLS.yaml"]
     )
@@ -74,6 +77,7 @@ def test_generate_index_exits_when_no_protocols_found(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
     monkeypatch.setenv("GITHUB_REF_NAME", "feature-branch")
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
     monkeypatch.setattr(
         sys, "argv", ["generate_protocols_yaml.py", "protocols", "PROTOCOLS.yaml"]
     )
