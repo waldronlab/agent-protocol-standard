@@ -2,6 +2,7 @@ import re
 import sys
 import subprocess
 import pytest
+import yaml
 from scripts.validate_protocol import validate_protocol, extract_frontmatter
 from pathlib import Path
 
@@ -21,7 +22,7 @@ def _matches_expected_diagnostic(expected: str, output: str) -> bool:
     if alt in output:
         return True
         
-    if "malformed 'orcid'" in expected and "Malformed ORCID" in output:
+    if ("malformed 'orcid'" in expected or "malformed ORCID" in expected) and "Malformed ORCID" in output:
         return True
         
     if "must be a single string" in expected and "Input should be a valid string" in output:
@@ -35,21 +36,20 @@ def _matches_expected_diagnostic(expected: str, output: str) -> bool:
         
     if "missing required 'authors' field" in expected and "Missing required fields: authors" in output:
         return True
+
+    required_field_match = re.match(r"'([^']+)' is required$", expected)
+    if required_field_match and f"Missing required fields: {required_field_match.group(1)}" in output:
+        return True
         
     if "must be a valid DOI or PMID" in expected and "String should match pattern" in output:
         return True
         
-    quoted = re.findall(r"'([^']+)'", expected)
-    if quoted and all(f"'{token}'" in output for token in quoted):
+    if (
+        expected == "'status' must be one of 'draft', 'stable', 'deprecated', 'superseded'"
+        and "'status' Input should be 'draft', 'stable', 'deprecated' or 'superseded'" in output
+    ):
         return True
-        
-    # Normalized expected words logic but much stricter: require ALL words > 4 chars to be present
-    
-    expected_words = [w for w in re.findall(r"[A-Za-z][A-Za-z0-9_-]*", expected.lower()) if len(w) >= 4]
-    output_lower = output.lower()
-    if expected_words and all(w in output_lower for w in expected_words):
-        return True
-        
+
     return False
 
 @pytest.fixture(autouse=True)
@@ -138,6 +138,104 @@ Do thing.
     assert not validate_protocol(str(protocol_path), str(tmp_path / "protocols"))
     output = capsys.readouterr().out
     assert "'reviews'" in output
+
+
+@pytest.mark.parametrize("field", ["name", "description", "version", "date", "status", "protocol_citation"])
+@pytest.mark.parametrize("bad_value", [None, ["bad"], {"bad": "value"}, 123, True])
+def test_required_scalar_fields_reject_malformed_shapes(tmp_path, capsys, monkeypatch, field, bad_value):
+    monkeypatch.setenv("GITHUB_REPOSITORY", "example-org/example-protocols")
+    protocol_path = tmp_path / "protocols" / "example-protocol" / "protocol.md"
+    protocol_path.parent.mkdir(parents=True, exist_ok=True)
+
+    frontmatter = {
+        "name": "example-protocol",
+        "description": "Example protocol",
+        "version": "1.0.0",
+        "authors": [{"name": "Ada Lovelace"}],
+        "date": "2026-03-01",
+        "status": "draft",
+        "protocol_citation": "10.1000/example-procedure",
+    }
+    frontmatter[field] = bad_value
+
+    protocol_path.write_text(
+        "---\n"
+        + yaml.safe_dump(frontmatter, sort_keys=False)
+        + "---\n\n"
+        + "# Example Protocol\n\n"
+        + "## Materials\n\n- Item\n\n"
+        + "## Steps\n\n### Step 1: Do thing\nDo thing.\n\n"
+        + "## History & Reviews\n\n"
+        + "### Version 1.0.0 (2026-03-01)\n\n"
+        + "#### Changes\n- Initial.\n\n"
+        + "#### Reviews\n*No reviews yet.*\n",
+        encoding="utf-8",
+    )
+
+    assert not validate_protocol(str(protocol_path), str(tmp_path / "protocols"))
+    output = capsys.readouterr().out
+    assert f"'{field}'" in output or f"Missing required fields: {field}" in output
+
+
+@pytest.mark.parametrize(
+    ("field", "bad_value", "should_fail"),
+    [
+        ("authors", None, True),
+        ("authors", "bad", True),
+        ("authors", 123, True),
+        ("authors", True, True),
+        ("authors", {"bad": "value"}, True),
+        ("protocols_used", None, False),
+        ("protocols_used", "bad", True),
+        ("protocols_used", 123, True),
+        ("protocols_used", True, True),
+        ("protocols_used", {"bad": "value"}, True),
+        ("reviews", None, False),
+        ("reviews", "bad", True),
+        ("reviews", 123, True),
+        ("reviews", True, True),
+        ("reviews", {"bad": "value"}, True),
+    ],
+)
+def test_container_fields_reject_malformed_shapes(
+    tmp_path, capsys, monkeypatch, field, bad_value, should_fail
+):
+    monkeypatch.setenv("GITHUB_REPOSITORY", "example-org/example-protocols")
+    protocol_path = tmp_path / "protocols" / "example-protocol" / "protocol.md"
+    protocol_path.parent.mkdir(parents=True, exist_ok=True)
+
+    frontmatter = {
+        "name": "example-protocol",
+        "description": "Example protocol",
+        "version": "1.0.0",
+        "authors": [{"name": "Ada Lovelace"}],
+        "date": "2026-03-01",
+        "status": "draft",
+        "protocol_citation": "10.1000/example-procedure",
+    }
+    frontmatter[field] = bad_value
+
+    protocol_path.write_text(
+        "---\n"
+        + yaml.safe_dump(frontmatter, sort_keys=False)
+        + "---\n\n"
+        + "# Example Protocol\n\n"
+        + "## Materials\n\n- Item\n\n"
+        + "## Steps\n\n### Step 1: Do thing\nDo thing.\n\n"
+        + "## History & Reviews\n\n"
+        + "### Version 1.0.0 (2026-03-01)\n\n"
+        + "#### Changes\n- Initial.\n\n"
+        + "#### Reviews\n*No reviews yet.*\n",
+        encoding="utf-8",
+    )
+
+    result = validate_protocol(str(protocol_path), str(tmp_path / "protocols"))
+    output = capsys.readouterr().out
+    if should_fail:
+        assert not result
+        assert f"'{field}'" in output
+    else:
+        assert result
 
 
 def test_extract_frontmatter_does_not_treat_arbitrary_three_chars_as_terminator(tmp_path):

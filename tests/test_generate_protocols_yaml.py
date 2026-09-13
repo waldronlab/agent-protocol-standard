@@ -20,8 +20,8 @@ def test_generate_index_uses_detected_repository_ref_and_serializes_dates(tmp_pa
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
     monkeypatch.setenv("GITHUB_REF_NAME", "feature-branch")
-    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
     monkeypatch.setattr(
         sys, "argv", ["generate_protocols_yaml.py", "protocols", "PROTOCOLS.yaml"]
     )

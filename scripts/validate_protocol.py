@@ -227,7 +227,10 @@ def validate_history(file_path, frontmatter, frontmatter_reviews):
                 else:
                     block_status = quoted.group(1)
                     if block_status not in ['approved', 'verified-with-benchmark', 'changes-requested', 'deprecated']:
-                        errors.append(f"Invalid review status '{block_status}' under version {label}. Must be one of: approved, verified-with-benchmark, changes-requested, deprecated")
+                        errors.append(
+                            f"Review by '{reviewer}' has invalid status '{block_status}' under version {label}. "
+                            "Must be one of: approved, verified-with-benchmark, changes-requested, deprecated"
+                        )
 
             if not any(re.match(r'^-[ \t]+\*\*Notes:\*\*', line) for line in block):
                 errors.append(f"Review by '{reviewer}' under version {label} is missing a '- **Notes:**' line")
