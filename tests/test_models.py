@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 from datetime import date
-from scripts.models import ProtocolFrontmatter, Author
+from scripts.models import ProtocolFrontmatter, Review
 
 def valid_dict():
     return {
@@ -74,3 +74,20 @@ def test_explicit_null_method_origin_citation_rejected():
     d["method_origin_citation"] = None
     with pytest.raises(ValidationError):
         ProtocolFrontmatter(**d)
+
+
+def test_impossible_frontmatter_date_rejected():
+    d = valid_dict()
+    d["date"] = "2026-02-30"
+    with pytest.raises(ValidationError):
+        ProtocolFrontmatter(**d)
+
+
+def test_impossible_review_date_rejected():
+    with pytest.raises(ValidationError):
+        Review(
+            name="Jane Doe",
+            date="2026-02-30",
+            protocol_version="1.0.0",
+            status="approved",
+        )

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Optional, Literal
-from datetime import date
+from datetime import date, datetime
 import re
 
 ORCID_PATTERN = r"^[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]$"
@@ -28,11 +28,14 @@ class Review(BaseModel):
 
     @field_validator('date', mode='before')
     def validate_date_format(cls, v):
-        import datetime
         if isinstance(v, str):
-            if not re.match(r'^[0-9]{4}-[0-9]{2}-[0-9]{2}$', v):
-                raise ValueError("Must be YYYY-MM-DD string")
-        elif not isinstance(v, datetime.date) or isinstance(v, datetime.datetime):
+            try:
+                return date.fromisoformat(v)
+            except ValueError as exc:
+                raise ValueError("Must be YYYY-MM-DD date") from exc
+        if isinstance(v, datetime):
+            raise ValueError("Must be a YYYY-MM-DD date")
+        if not isinstance(v, date):
             raise ValueError("Must be a YYYY-MM-DD date")
         return v
 
@@ -74,11 +77,14 @@ class ProtocolFrontmatter(BaseModel):
 
     @field_validator('date', mode='before')
     def validate_date_format(cls, v):
-        import datetime
         if isinstance(v, str):
-            if not re.match(r'^[0-9]{4}-[0-9]{2}-[0-9]{2}$', v):
-                raise ValueError("Must be YYYY-MM-DD string")
-        elif not isinstance(v, datetime.date) or isinstance(v, datetime.datetime):
+            try:
+                return date.fromisoformat(v)
+            except ValueError as exc:
+                raise ValueError("Must be YYYY-MM-DD date") from exc
+        if isinstance(v, datetime):
+            raise ValueError("Must be a YYYY-MM-DD date")
+        if not isinstance(v, date):
             raise ValueError("Must be a YYYY-MM-DD date")
         return v
 

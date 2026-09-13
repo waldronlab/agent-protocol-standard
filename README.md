@@ -64,6 +64,8 @@ Then:
 Both actions take a `protocols-path` input if your protocols live somewhere other than `protocols/`.
 Neither hardcodes a repository name: `protocol_url` values are built from the repository the workflow
 runs in, so nothing in the template needs editing to point at you.
+Both also take `python-version` (default `3.11`); the legacy `r-version` input remains accepted for
+compatibility but is deprecated and ignored.
 
 `@v0` is a moving tag, so your repository tracks the standard without a pull request per release —
 which is the point, since a validator that has fallen behind means silently enforcing an older
