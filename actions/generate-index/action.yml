@@ -33,7 +33,7 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: pip install pyyaml
+      run: pip install pyyaml pydantic
 
     - name: Generate index
       shell: bash
