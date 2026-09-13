@@ -12,17 +12,16 @@ status: draft                     # draft | stable | deprecated | superseded
 license: CC-BY-4.0
 type: atomic                      # atomic | composite
 
-# An atomic protocol carries exactly one `method_citation`: the primary literature where the
-# method it implements was originally published. It records the method's origin — not this
-# document's identity, which is `artifact_doi` below. A composite usually omits this and inherits
-# the citations of the protocols it composes — unless the composition was itself published as a
-# method, in which case name that paper here.
-method_citation: "10.0000/replace-with-a-real-doi"
+# REQUIRED. Who published THESE INSTRUCTIONS? Name the publication that describes this procedure as
+# written here, parameters included. Where no publication describes it — you are writing the first
+# definition — name this protocol's own DOI instead: `artifact_doi` if it has one, otherwise
+# `collection_doi`. Repeating `collection_doi` here is how a protocol says "published here, by us".
+protocol_citation: "10.0000/replace-with-a-real-doi"
 
-# A publication that describes or validates THIS protocol — the procedure as written here,
-# including its parameterization. Distinct from `method_citation`, which names the method in
-# general. Delete if there is none.
-protocol_citation: ~
+# OPTIONAL. Who invented the method? Name the primary literature where it was FIRST PROPOSED — not a
+# paper that applies an already-established method. Omit this line entirely if the protocol
+# originates no method: documenting how to operate a tool is not a method someone proposed.
+method_origin_citation: "10.0000/replace-with-a-real-doi"
 
 # DOIs identifying this document and the collection housing it, if they exist. Delete if not.
 artifact_doi: ~

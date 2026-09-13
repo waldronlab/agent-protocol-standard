@@ -1,1 +1,1 @@
-Field 'citation' was renamed to 'method_citation' (see PROTOCOL_STANDARD.md) in 'example-protocol'
+Field 'citation' was renamed to 'method_origin_citation' (see PROTOCOL_STANDARD.md) in 'example-protocol'

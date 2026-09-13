@@ -23,37 +23,49 @@ Protocols follow a modular two-tier design:
 
 1. **Atomic Protocols**:
    * Implement a single, focused methodological operation.
-   * **Strictly 1 `method_citation`:** A single DOI/PMID naming the primary literature where the method was originally published — the paper that *proposed* it, not one that applied it.
+   * **Strictly 1 `method_origin_citation`:** A single DOI/PMID naming the primary literature where the method was originally published — the paper that *proposed* it, not one that applied it.
    * Do not compose other protocols (`protocols_used: []`).
 2. **Composite Protocols**:
    * Implement multi-step workflows or end-to-end pipelines by composing atomic protocols.
    * **Composition:** List all constituent atomic protocols in `protocols_used`.
-   * **Provenance:** Automatically inherit and aggregate the `method_citation` of every constituent atomic protocol upon execution. Most composites add no `method_citation` of their own — they sequence methods rather than proposing one, and a paper describing the pipeline belongs in `protocol_citation`. Where the composition is *itself* a published method, `method_citation` names the paper that proposed it.
+   * **Provenance:** Automatically inherit and aggregate the `method_origin_citation` of every constituent atomic protocol upon execution. Most composites add no `method_origin_citation` of their own — they sequence methods rather than proposing one, and a paper describing the pipeline belongs in `protocol_citation`. Where the composition is *itself* a published method, `method_origin_citation` names the paper that proposed it.
 
-### `method_citation` and `protocol_citation`
+### The two citation fields
 
-The two citation fields answer different questions, and a protocol may carry both.
+Each answers one question. Answer them separately; do not define them against each other.
 
-`method_citation` names the origin of the method in general. `protocol_citation` names a publication of
-this precise usage — the parameter values, thresholds, and choices this protocol fixes.
+| Field | The question it answers | Example |
+|---|---|---|
+| `protocol_citation` *(required)* | **Who published these instructions?** | Pasolli et al. 2016, for a protocol written from that paper's procedure |
+| `method_origin_citation` *(optional)* | **Who invented the method?** | Breiman 2001, for random forests |
 
-**One method can therefore be the basis of several protocols.** Random forest classification is a single
-method with a single origin, but a published microbiome parameterization and a different published
-parameterization for the same data type are genuinely different procedures, producing different results
-from the same inputs. Each is its own protocol. They share a `method_citation` and are distinguished by
-their `protocol_citation`.
+**Where no publication describes the procedure, `protocol_citation` names this protocol's own DOI.**
+That is the normal case for a protocol written here rather than transcribed from a paper, and it is a
+claim rather than a gap:
 
-This is what keeps the one-method-one-citation rule from forcing unlike procedures into one document.
-Protocols that share a `method_citation` are siblings; the `protocol_citation` says which sibling this is.
+*   `protocol_citation` ≠ `collection_doi` — an external publication describes this procedure.
+*   `protocol_citation` = `collection_doi` — **a first definition, published here.**
 
-A `method_citation` must be a DOI (`10.1000/xyz`) or a PubMed ID (`PMID:12345678`) — something a reader
-or an agent can resolve. Free text naming a paper is not enough, and neither is the placeholder the
-starter protocol in `template/` ships: a new repository's validation stays red until a real citation
-replaces it, because that is the one thing the template cannot supply.
+An absent field could mean either of those, or that nobody filled it in. Requiring the field forces the
+distinction to be stated, and CI can check the answer is one of the two legal shapes.
 
-A test for which field a DOI belongs in: **if the protocol's steps were rewritten, would the DOI still be
-right?** A method's origin survives any rewrite — `method_citation`. A publication describing this
-procedure does not, because the procedure would no longer be the one described — `protocol_citation`.
+Use the **concept** DOI rather than a version DOI. A version DOI names the exact bytes, which sounds
+more precise, but it cannot be written into a protocol before the release that mints it exists. Name,
+version, and concept DOI together identify the exact protocol without that circularity.
+
+**One method can be the basis of several protocols.** Random forest classification has a single origin,
+but a published microbiome parameterization and a different published parameterization are genuinely
+different procedures producing different results from the same inputs. Each is its own protocol. They
+share a `method_origin_citation` and are distinguished by their `protocol_citation`.
+
+**Not every protocol originates a method, and it is wrong to invent one.** A protocol documenting how to
+build a tool's reference database performs no method that anybody proposed. Omit
+`method_origin_citation` there; a field filled in to satisfy a validator is worse than an absent one.
+
+Both fields must be a DOI (`10.1000/xyz`) or a PubMed ID (`PMID:12345678`) — something a reader or an
+agent can resolve. Free text naming a paper is not enough, and neither is the placeholder the starter
+protocol in `template/` ships: a new repository's validation stays red until a real citation replaces
+it, because that is the one thing the template cannot supply.
 
 ### YAML Frontmatter Schema
 
@@ -68,6 +80,9 @@ All fields must use `snake_case`.
     *   `orcid`: (String, Optional) Author's ORCID. Recommended rather than required, but validated
         when present: a malformed ORCID is a claim about a named person that resolves to nobody.
 *   `date`: (Date: YYYY-MM-DD) Creation or last modification date.
+*   `protocol_citation`: (String) DOI or PMID answering **who published these instructions**. Where a
+    publication describes this procedure as written here — parameters included — name it. Where none
+    does, name this protocol's own DOI: `artifact_doi` if it has one, otherwise `collection_doi`.
 *   `status`: (String: `draft` | `stable` | `deprecated` | `superseded`) The protocol's own lifecycle.
     *   `draft`: still being worked out; expect it to change.
     *   `stable`: there is reasonable confidence in the protocol and no further changes are immediately
@@ -79,8 +94,7 @@ All fields must use `snake_case`.
 **Optional Fields:**
 *   `type`: (String: `atomic` | `composite`) Protocol architectural type (defaults to `atomic` if `protocols_used` is empty).
 *   `license`: (String) License identifier (e.g., "CC-BY-4.0").
-*   `method_citation`: (String) DOI or PMID for the primary literature that **proposed the method** this protocol performs. Describes the method in general, independent of how this protocol applies it. Expected on an atomic protocol that claims a method. Permitted on a composite when the composition is itself a published method, and otherwise omitted.
-*   `protocol_citation`: (String) DOI for a peer-reviewed publication that **describes or validates this protocol specifically** — the procedure as written here, including its parameterization.
+*   `method_origin_citation`: (String) DOI or PMID answering **who invented the method** — the primary literature where it was *first proposed*, not a paper that applies an already-established method. Omit it entirely where the protocol originates no method: documenting how to operate a tool is not a method someone proposed. A composite may carry one where the composition was itself published as a method.
 *   `artifact_doi`: (String) DOI identifying **this document** as a citable artifact (e.g., from protocols.io).
 *   `collection_doi`: (String) DOI identifying the **repository or collection** housing this protocol (e.g., a Zenodo record).
 *   `upstream_repositories`: (Array of Strings) URLs to source code repositories containing upstream tools or pipeline implementations.
@@ -278,7 +292,7 @@ artifact_doi: ~
 collection_doi: ~
 protocol_citation: ~
 
-method_citation: "10.1016/j.cell.2019.01.001"
+method_origin_citation: "10.1016/j.cell.2019.01.001"
 
 upstream_repositories:
   - "https://github.com/biobakery/metaphlan"

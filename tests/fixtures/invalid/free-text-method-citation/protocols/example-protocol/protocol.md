@@ -19,7 +19,8 @@ date: 2026-03-01
 status: draft
 license: CC-BY-4.0
 type: atomic
-method_citation: "see the HUMAnN 4 paper"
+method_origin_citation: "see the HUMAnN 4 paper"
+protocol_citation: "10.1000/example-procedure"
 protocols_used: []
 key_packages: []
 category: example

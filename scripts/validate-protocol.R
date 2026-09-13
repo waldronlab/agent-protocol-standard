@@ -623,20 +623,21 @@ validate_protocol <- function(file_path) {
     errors <- c(errors, "'type: composite' requires a non-empty 'protocols_used'; a composite composes other protocols")
   }
 
-  # Check method_citation field
+  # Check method_origin_citation field
   # Presence, not value: `citations: ~` parses to NULL, so a value check would let the deprecated
   # key through. Same reasoning as the renamed-field loop below.
   if ("citations" %in% names(frontmatter)) {
-    errors <- c(errors, "Deprecated 'citations' field found. Use 'method_citation' (singular string)")
+    errors <- c(errors, "Deprecated 'citations' field found. Use 'method_origin_citation' (singular string)")
   }
 
   # Fields renamed so that each name says what it identifies (ADR 0009).
   # Rejected rather than accepted-with-warning: the spec is pre-1.0 and no protocol predates the rename.
   renamed_fields <- list(
-    citation        = "method_citation",
-    publication_doi = "protocol_citation",
-    protocol_doi    = "artifact_doi",
-    repository_doi  = "collection_doi"
+    citation               = "method_origin_citation",
+    method_citation        = "method_origin_citation",
+    publication_doi        = "protocol_citation",
+    protocol_doi           = "artifact_doi",
+    repository_doi         = "collection_doi"
   )
   for (old_name in names(renamed_fields)) {
     # Presence, not value: a YAML null placeholder such as `protocol_doi: ~` parses to NULL, and the
@@ -647,23 +648,42 @@ validate_protocol <- function(file_path) {
     }
   }
 
-  # A composite may carry a method_citation: a sequence of methods can itself be published as a
-  # method (ADR 0010). Whether it should is a judgement about the literature, not something to
-  # validate. An atomic protocol is one method, so it must carry one.
-  has_citation <- "method_citation" %in% names(frontmatter)
-  if (!has_citation) {
-    if (effective_type == "atomic") {
-      errors <- c(errors, "An atomic protocol must carry a 'method_citation' naming the primary literature where the method was first proposed")
+  # Shared shape check for both citation fields. Neither may be the starter protocol's placeholder,
+  # which is DOI-shaped and so passes the pattern on its own (ADR 0012).
+  check_citation <- function(field) {
+    value <- frontmatter[[field]]
+    if (!scalar_string(value)) {
+      return(sprintf("'%s' must be a single string (DOI or PMID), found %s", field, describe_value(value)))
     }
-  } else if (!scalar_string(frontmatter$method_citation)) {
-    errors <- c(errors, sprintf("'method_citation' must be a single string (DOI or PMID), found %s",
-                                describe_value(frontmatter$method_citation)))
-  } else if (identical(frontmatter$method_citation, template_placeholder_citation)) {
-    errors <- c(errors, sprintf("'method_citation' is still the template placeholder '%s'; replace it with the real citation",
-                                template_placeholder_citation))
-  } else if (!grepl(citation_pattern, frontmatter$method_citation)) {
-    errors <- c(errors, sprintf("'method_citation' must be a DOI ('10.1000/xyz') or a PubMed ID ('PMID:12345678'), found: '%s'",
-                                frontmatter$method_citation))
+    if (identical(value, template_placeholder_citation)) {
+      return(sprintf("'%s' is still the template placeholder '%s'; replace it with the real citation",
+                     field, template_placeholder_citation))
+    }
+    if (!grepl(citation_pattern, value)) {
+      return(sprintf("'%s' must be a DOI ('10.1000/xyz') or a PubMed ID ('PMID:12345678'), found: '%s'",
+                     field, value))
+    }
+    NULL
+  }
+
+  # `protocol_citation` is required of every protocol (ADR 0014). Where a publication describes this
+  # procedure it names that publication; where none does, it names the protocol's own DOI, and the
+  # equality with `collection_doi` is what makes "first definition, published here" a claim the
+  # metadata states rather than an absence a reader has to interpret.
+  if (!("protocol_citation" %in% names(frontmatter))) {
+    errors <- c(errors, "'protocol_citation' is required: the DOI or PMID of a publication describing this procedure, or this protocol's own 'artifact_doi' or 'collection_doi' where none does")
+  } else {
+    problem <- check_citation("protocol_citation")
+    if (!is.null(problem)) errors <- c(errors, problem)
+  }
+
+  # `method_origin_citation` is optional: it names where the method was first proposed, which is a
+  # question about the literature that not every protocol has an answer to — a protocol documenting
+  # how to operate a tool did not originate a method (ADR 0014). A composite may carry one, since a
+  # sequence of methods can itself be published as a method (ADR 0010).
+  if ("method_origin_citation" %in% names(frontmatter)) {
+    problem <- check_citation("method_origin_citation")
+    if (!is.null(problem)) errors <- c(errors, problem)
   }
 
   # The body sections. PROTOCOL_STANDARD.md requires '## Materials' and '## Steps' with at least one

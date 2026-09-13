@@ -1,6 +1,6 @@
 ---
 name: example-protocol
-description: A minimal conforming protocol used as a fixture for the validator test suite.
+description: A first definition — protocol_citation repeats collection_doi, and no method origin is claimed.
 version: 1.1.0
 authors:
   - name: Ada Lovelace
@@ -18,7 +18,9 @@ reviews:
 date: 2026-03-01
 status: draft
 license: CC-BY-4.0
+collection_doi: "10.5281/zenodo.9999999"
 type: atomic
+protocol_citation: "10.5281/zenodo.9999999"
 protocols_used: []
 key_packages: []
 category: example
@@ -27,7 +29,7 @@ tags: [example, fixture]
 
 # Example Protocol
 
-A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed
+A first definition: protocol_citation repeats collection_doi, and no method origin is claimed, exercising two releases, a reviewed older version, an unreviewed
 current version, and a reviewer with and without an ORCID.
 
 ## Materials

@@ -1,1 +1,0 @@
-An atomic protocol must carry a 'method_citation'

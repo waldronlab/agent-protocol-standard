@@ -6,6 +6,7 @@ authors:
   - name: Ada Lovelace
 date: 2026-01-15
 status: draft
+protocol_citation: "10.1000/example-procedure"
 license: CC-BY-4.0
 type: composite
 protocols_used:

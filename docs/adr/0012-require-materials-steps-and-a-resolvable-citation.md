@@ -4,6 +4,8 @@
 - **Date:** 2026-09-12
 - **Deciders:** Levi Waldron (User), AI Agent
 
+> **Amended by [ADR-0014](0014-two-citation-questions.md) (2026-09-13).** `method_citation` below is renamed `method_origin_citation` and is no longer required; `protocol_citation` is now the required field. The decisions recorded here otherwise stand; the names are preserved as written for the historical record.
+
 ## Context and Problem Statement
 
 A `protocol.md` with no `## Materials`, no `## Steps`, and no `method_citation` — nothing but frontmatter

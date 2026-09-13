@@ -5,6 +5,8 @@
 - **Deciders:** Levi Waldron (User), AI Agent
 - **Amends:** [ADR-0009](0009-name-metadata-fields-by-what-they-identify.md) — corrects one claim; the rename it records stands
 
+> **Amended by [ADR-0014](0014-two-citation-questions.md) (2026-09-13).** `method_citation` below is renamed `method_origin_citation` and is no longer required; `protocol_citation` is now the required field. The decisions recorded here otherwise stand; the names are preserved as written for the historical record.
+
 ## Context and Problem Statement
 
 ADR 0009 asserted that a composite protocol has no `method_citation`, on the reasoning that a composite

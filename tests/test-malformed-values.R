@@ -39,7 +39,7 @@ scalar_fields <- list(
   date            = NULL,
   status          = "status: draft",
   type            = "type: atomic",
-  method_citation = 'method_citation: "10.1000/example"'
+  method_origin_citation = 'method_origin_citation: "10.1000/example"'
 )
 
 template_path <- file.path(fixtures_dir, "valid", "basic", "protocols", "example-protocol", "protocol.md")

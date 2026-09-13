@@ -1,6 +1,6 @@
 ---
 name: example-protocol
-description: A minimal conforming protocol used as a fixture for the validator test suite.
+description: A protocol naming its method's origin but no publication describing the procedure used as a fixture for the validator test suite.
 version: 1.1.0
 authors:
   - name: Ada Lovelace
@@ -12,15 +12,14 @@ reviews:
     protocol_version: 1.0.0
     status: verified-with-benchmark
   - name: Alan Turing
-    date: 2026-01-21
+    date: 2026-01-20
     protocol_version: 1.0.0
-    status: changes-requested
+    status: approved
 date: 2026-03-01
 status: draft
 license: CC-BY-4.0
 type: atomic
 method_origin_citation: "10.1000/example"
-protocol_citation: "10.1000/example-procedure"
 protocols_used: []
 key_packages: []
 category: example
@@ -29,7 +28,7 @@ tags: [example, fixture]
 
 # Example Protocol
 
-A minimal conforming protocol, exercising two releases, a reviewed older version, an unreviewed
+A protocol naming its method's origin but no publication describing the procedure, exercising two releases, a reviewed older version, an unreviewed
 current version, and a reviewer with and without an ORCID.
 
 ## Materials
