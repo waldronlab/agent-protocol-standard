@@ -47,6 +47,14 @@ def detect_repository() -> str:
     return None
 
 def detect_ref() -> str:
+    # Checked first, and deliberately not a GITHUB_* name. A caller that pins its checkout to a
+    # branch has to be able to tell the generator which ref the index describes, or protocol_url
+    # values name a revision the index was not built from. GITHUB_REF_NAME is runner-provided and
+    # overriding it from a workflow is unsupported, so the override gets its own variable.
+    explicit = os.environ.get("PROTOCOL_INDEX_REF")
+    if explicit:
+        return explicit
+
     if os.environ.get("GITHUB_EVENT_NAME") == "pull_request":
         base_ref = os.environ.get("GITHUB_BASE_REF")
         return base_ref if base_ref else "main"

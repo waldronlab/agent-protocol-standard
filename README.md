@@ -36,7 +36,8 @@ Some likely use cases include:
 
 Protocol repositories federate into the registry here, and need no copy of the tooling: validation
 and index generation are published from this repository as GitHub composite actions, so both stay in
-lockstep with [`PROTOCOL_STANDARD.md`](PROTOCOL_STANDARD.md). Pin them to a release tag.
+lockstep with [`PROTOCOL_STANDARD.md`](PROTOCOL_STANDARD.md). The template references them at
+`@main`; see [below](#the-template-references-main-not-a-release-tag).
 
 **Copy the contents of [`template/`](template/) into a new empty repository.** It is a complete
 content node: the two workflows, a README and CONTRIBUTING that name this standard as the authority
@@ -79,11 +80,23 @@ Neither hardcodes a repository name: `protocol_url` values are built from the re
 runs in, so nothing in the template needs editing to point at you.
 Both also take `python-version` (default `3.11`).
 
-`@v0` is a moving tag, so your repository tracks the standard without a pull request per release —
-which is the point, since a validator that has fallen behind means silently enforcing an older
-standard than you claim to follow. To hold a fixed version instead, pin the release tag `@v0.3.1`
-and update it by hand — or, since a git tag can itself be retargeted, pin a commit SHA, which is the
-only genuinely immutable reference. Note that `generate-index` runs with `contents: write`.
+### The template references `@main`, not a release tag
+
+A node validating
+against a snapshot conforms to a version of the standard nobody publishes any more, and the failure
+is silent: a green check produced by a validator older than the rule it claims to enforce. Tracking
+`main` means a change that breaks you breaks you loudly, at a time when the spec is `0.y.z` and says
+so.
+
+This is a live question rather than a settled one. Pinning is the ordinary answer for a *library*,
+where a consumer reasonably freezes a dependency; it is a stranger answer for a *standard*, where
+conforming to last year's version is not obviously conformance at all. If you have a reason to pin —
+a node you cannot update promptly, say — pin a commit SHA rather than a tag, since a tag can itself
+be retargeted, and tell us, because the answer should be driven by what federated nodes actually
+need.
+
+Note that `generate-index` runs with `contents: write` where no App is configured, since GITHUB_TOKEN
+does the push in that case.
 
 ## Development
 
@@ -105,9 +118,17 @@ only genuinely immutable reference. Note that `generate-index` runs with `conten
 
 ### Releasing
 
-Tag `vX.Y.Z`, then publish a GitHub Release for that tag. `retarget-major-tag.yml` moves the moving
-tag (`v0`) onto it, so nothing needs moving by hand — which is what the first four releases required,
-and one of them drifted a merge behind `main` before anyone noticed.
+Tag `vX.Y.Z`, then publish a GitHub Release for that tag. `retarget-major-tag.yml` moves `v0` onto
+it, so nothing needs moving by hand — which is what the first four releases required, and one of them
+drifted a merge behind `main` before anyone noticed.
+
+Releases are now a record rather than a distribution channel: the template consumes the actions at
+`@main`, so nothing is waiting on a tag to move. The versioned `v0.x.y` release tags remain the thing
+to reference if you have a reason to hold a fixed version — `v0` itself is not one, since it is
+retargeted onto every qualifying release (see Releasing below for which ones qualify) and is
+therefore no more fixed than `main`. Note that a release tag is only fixed by
+convention: a git tag can be retargeted, so a commit SHA is still the only genuinely immutable
+reference.
 
 The workflow declines to move the tag, with a notice rather than a failure, for a pre-release, for a
 tag that is not `vX.Y.Z`, and for a release that is not the highest on its line — so republishing an

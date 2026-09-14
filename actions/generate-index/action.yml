@@ -27,9 +27,19 @@ inputs:
   committer-email:
     description: >-
       Email recorded as the commit author. For a GitHub App this is
-      <app-id>+<app-slug>[bot]@users.noreply.github.com.
+      <bot-user-id>+<app-slug>[bot]@users.noreply.github.com, where bot-user-id is the id of the
+      App's bot USER account — `gh api /users/<app-slug>[bot] --jq .id` — and NOT the App
+      registration id. Using the registration id still pushes, but GitHub silently declines to
+      associate the commit with the bot.
     required: false
     default: 'github-actions[bot]@users.noreply.github.com'
+  ref:
+    description: >-
+      The ref the index describes, used to build protocol_url values. Set this when the caller pins
+      its checkout to a branch — otherwise the generator infers the ref from the event, and a manual
+      dispatch from another branch would index this tree under that ref's URLs.
+    required: false
+    default: ''
   python-version:
     description: 'Python version to install.'
     required: false
@@ -49,6 +59,10 @@ runs:
 
     - name: Generate index
       shell: bash
+      env:
+        # Deliberately not GITHUB_REF_NAME: that is runner-provided and a workflow cannot reliably
+        # override it. detect_ref() checks this first.
+        PROTOCOL_INDEX_REF: ${{ inputs.ref }}
       run: |
         python3 "$GITHUB_ACTION_PATH/../../scripts/generate_protocols_yaml.py" \
           "${{ inputs.protocols-path }}" "${{ inputs.output }}"
@@ -75,4 +89,11 @@ runs:
           exit 0
         fi
         git commit -m "${{ inputs.commit-message }}"
+
+        # A single push, deliberately. A commit landing on the branch while this job runs makes the
+        # push non-fast-forward and fails the run — loudly, and re-runnable from the Actions tab or
+        # by workflow_dispatch. A rebase-and-retry was tried and removed: to be correct it has to
+        # regenerate the index after each rebase, since the intervening commit may have changed
+        # protocols/, and that is more moving parts in a shared action than a race needing a merge
+        # inside a one-minute window is worth.
         git push

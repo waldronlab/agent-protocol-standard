@@ -48,6 +48,22 @@ def test_detect_repository_falls_back_to_git_remote(monkeypatch):
     assert detect_repository() == "owner/from-git"
 
 
+
+def test_detect_ref_prefers_the_explicit_override(monkeypatch):
+    # A caller pinning its checkout to a branch must be able to say so. GITHUB_REF_NAME is
+    # runner-provided, so the override has its own name and wins over every other source.
+    monkeypatch.setenv("PROTOCOL_INDEX_REF", "main")
+    monkeypatch.setenv("GITHUB_REF_NAME", "some-other-branch")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "workflow_dispatch")
+    assert detect_ref() == "main"
+
+
+def test_detect_ref_ignores_an_empty_override(monkeypatch):
+    monkeypatch.setenv("PROTOCOL_INDEX_REF", "")
+    monkeypatch.setenv("GITHUB_REF_NAME", "feature-branch")
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    assert detect_ref() == "feature-branch"
+
 def test_detect_ref_pull_request_uses_base_ref(monkeypatch):
     monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
     monkeypatch.setenv("GITHUB_BASE_REF", "main")

@@ -5,6 +5,17 @@
 - **Deciders:** Levi Waldron (User), AI Agent
 - **Supersedes:** [0002. Combined Registry and Protocols Repository](0002-combined-registry-and-protocols.md), in part
 
+> **Amended by the template's move to `@main` (2026-09-14).** Where §3 below says a content repository
+> consumes the actions in "about ten lines of YAML pinned to a release tag", and where the Consequences
+> call the content repository "a second place where a version can be pinned", read `@main`: the shipped
+> template references the actions there, so that a node cannot validate against a standard older than
+> the one it claims to follow.
+>
+> This ADR's actual decision — distributing the tooling as composite actions rather than vendoring a
+> copy into every content repository — is unaffected, and is in fact what makes tracking `main`
+> possible at all. Whether a federated node should ever pin is deliberately left open; see the matching
+> note on ADR 0011.
+
 ## Context and Problem Statement
 
 ADR 0002 deliberately combined the federation registry with the Waldron Lab's own protocols in a
