@@ -53,7 +53,8 @@ class ProtocolFrontmatter(BaseModel):
 
 ## Testing Validation Changes
 
-Because we use Pydantic, testing Pydantic frontmatter rules does not require writing markdown files to disk or dealing with fragile string manipulation. You test rules entirely in-memory by passing dictionaries to the models.
+Because we use Pydantic, testing frontmatter model rules does not require writing markdown files to disk or dealing with fragile string manipulation. You test those model rules in-memory by passing dictionaries to the models.
+End-to-end validator behavior is still tested with Markdown fixtures and CLI/filesystem execution paths in `tests/test_validate_protocol.py`.
 
 Add your tests to `tests/test_models.py`:
 

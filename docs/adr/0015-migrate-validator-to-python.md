@@ -21,7 +21,7 @@ We will transition the `agent-protocol-standard` validator and its test suite fr
 
 ### Positive
 *   **Declarative Simplicity:** Complex validation logic (e.g., cross-field dependencies, type checking) is now handled natively by Pydantic. The core logic was reduced from ~800 lines of procedural R to ~160 lines of declarative Python.
-*   **Robust Testing:** Testing is now performed in-memory on Python dictionaries (e.g., `ProtocolFrontmatter(**bad_dict)`), reducing the need for fragile string manipulation and disk I/O for frontmatter validation.
+*   **Robust Testing:** Frontmatter model tests are now performed in-memory on Python dictionaries (e.g., `ProtocolFrontmatter(**bad_dict)`), reducing the need for fragile string manipulation for schema-rule validation while preserving end-to-end Markdown fixture and CLI validation.
 *   **Speed:** The test suite executes in a fraction of the time.
 
 ### Negative / Trade-offs
