@@ -60,8 +60,12 @@ Then:
    pull requests blocks `github-actions[bot]`, and Actions cannot be granted a bypass — bypass
    actors of type `Integration` must be GitHub Apps installed on the organisation, and Actions is
    not one. Generate a keypair, add the public key under **Settings → Deploy keys** with write
-   access, add the private key as the `INDEX_DEPLOY_KEY` secret, and add `DeployKey` as a bypass
-   actor on the ruleset. The template's workflow already passes the secret to `actions/checkout`.
+   access, and add `DeployKey` as a bypass actor on the ruleset. Hold the private key as an
+   **environment** secret named `INDEX_DEPLOY_KEY`, in an environment called `index-generation`
+   whose deployment branch policy allows only `main` — a repository secret would be readable from a
+   pull request branch, since same-repo pull requests do receive secrets, and this key bypasses the
+   protection you just configured. The template's workflow already declares the environment and
+   passes the secret to `actions/checkout`.
 4. Push to `main` and let the index generate.
 5. **Open a pull request adding your repository to [`registry.yaml`](registry.yaml).** Until that
    entry exists nothing points at your index, so no agent will ever fetch it — a repository with a

@@ -15,6 +15,11 @@ permissions:
 jobs:
   generate-index:
     runs-on: ubuntu-latest
+    # Hold the deploy key in an environment whose deployment branch policy allows only `main`.
+    # A pull request from a branch in the same repository can otherwise read it — same-repo PRs do
+    # receive secrets — and this key bypasses branch protection. Delete this line if `main` is not
+    # protected and you kept the key as a plain repository secret.
+    environment: index-generation
     steps:
       # The index is pushed back to a protected branch, so the checkout authenticates with a
       # write-scoped deploy key rather than GITHUB_TOKEN: a ruleset requiring pull requests blocks
