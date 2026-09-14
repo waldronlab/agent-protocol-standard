@@ -5,6 +5,8 @@
 - **Deciders:** Levi Waldron (User), AI Agent
 - **Amends:** [ADR-0009](0009-name-metadata-fields-by-what-they-identify.md) — settles the tag question it raised and deferred
 
+> **Amended by the template's move to `@main` (2026-09-14).** The consequence below that "consumers must reference `@v0`" no longer describes the shipped template, which references `@main` so that a node cannot validate against a standard older than the one it claims to follow. `@v0` still exists and still moves on release. Whether a federated node should ever pin is deliberately left open; if it settles, it warrants an ADR superseding this consequence and ADR 0006 §3.
+
 ## Context and Problem Statement
 
 ADR 0009 dropped `spec_version` to `0.1.0`, on the grounds that `1.0.0` claimed a stability commitment

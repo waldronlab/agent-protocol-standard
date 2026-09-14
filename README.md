@@ -36,7 +36,8 @@ Some likely use cases include:
 
 Protocol repositories federate into the registry here, and need no copy of the tooling: validation
 and index generation are published from this repository as GitHub composite actions, so both stay in
-lockstep with [`PROTOCOL_STANDARD.md`](PROTOCOL_STANDARD.md). Pin them to a release tag.
+lockstep with [`PROTOCOL_STANDARD.md`](PROTOCOL_STANDARD.md). The template references them at
+`@main`; see [below](#the-template-references-main-not-a-release-tag-and-that-is-deliberate).
 
 **Copy the contents of [`template/`](template/) into a new empty repository.** It is a complete
 content node: the two workflows, a README and CONTRIBUTING that name this standard as the authority
@@ -115,9 +116,13 @@ does the push in that case.
 
 ### Releasing
 
-Tag `vX.Y.Z`, then publish a GitHub Release for that tag. `retarget-major-tag.yml` moves the moving
-tag (`v0`) onto it, so nothing needs moving by hand — which is what the first four releases required,
-and one of them drifted a merge behind `main` before anyone noticed.
+Tag `vX.Y.Z`, then publish a GitHub Release for that tag. `retarget-major-tag.yml` moves `v0` onto
+it, so nothing needs moving by hand — which is what the first four releases required, and one of them
+drifted a merge behind `main` before anyone noticed.
+
+Releases are now a record rather than a distribution channel: the template consumes the actions at
+`@main`, so nothing is waiting on a tag to move. `v0` is kept for anyone who has a reason to pin, and
+because the drift it accumulates is a useful signal of how far behind a pinned consumer would be.
 
 The workflow declines to move the tag, with a notice rather than a failure, for a pre-release, for a
 tag that is not `vX.Y.Z`, and for a release that is not the highest on its line — so republishing an
