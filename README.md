@@ -123,9 +123,11 @@ it, so nothing needs moving by hand — which is what the first four releases re
 drifted a merge behind `main` before anyone noticed.
 
 Releases are now a record rather than a distribution channel: the template consumes the actions at
-`@main`, so nothing is waiting on a tag to move. The immutable `v0.x.y` release tags remain the thing
+`@main`, so nothing is waiting on a tag to move. The versioned `v0.x.y` release tags remain the thing
 to reference if you have a reason to hold a fixed version — `v0` itself is not one, since it moves on
-every release and is therefore no more fixed than `main`.
+every release and is therefore no more fixed than `main`. Note that a release tag is only fixed by
+convention: a git tag can be retargeted, so a commit SHA is still the only genuinely immutable
+reference.
 
 The workflow declines to move the tag, with a notice rather than a failure, for a pre-release, for a
 tag that is not `vX.Y.Z`, and for a release that is not the highest on its line — so republishing an

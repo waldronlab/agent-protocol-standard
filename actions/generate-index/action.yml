@@ -78,4 +78,22 @@ runs:
           exit 0
         fi
         git commit -m "${{ inputs.commit-message }}"
-        git push
+
+        # A commit can land on the branch while this job is installing or generating, which makes
+        # the push non-fast-forward. Rebase onto the new tip and retry rather than failing: the
+        # index commit touches one generated file, so it rebases cleanly unless something else
+        # edited the same file — and that case should fail loudly rather than be forced through.
+        branch="$(git rev-parse --abbrev-ref HEAD)"
+        for attempt in 1 2 3; do
+          if git push origin "HEAD:$branch"; then
+            exit 0
+          fi
+          echo "::notice::push rejected (attempt $attempt); rebasing onto the current $branch"
+          git fetch origin "$branch"
+          git rebase "origin/$branch" || {
+            echo "::error::could not rebase the index commit onto $branch; resolve by hand"
+            exit 1
+          }
+        done
+        echo "::error::push still rejected after 3 attempts"
+        exit 1

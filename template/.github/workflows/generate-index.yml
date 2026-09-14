@@ -86,6 +86,11 @@ jobs:
       # green while running the wrong code. Tracking `main` means a breaking change reaches you
       # loudly instead, which is the trade this project wants while the spec is 0.y.z.
       - uses: waldronlab/agent-protocol-standard/actions/generate-index@main
+        env:
+          # The checkout above is pinned to `main`, so the generator must build `protocol_url`
+          # values from `main` too. Without this, a workflow_dispatch from another branch or tag
+          # would index main's content under that ref's URLs.
+          GITHUB_REF_NAME: main
         with:
           # Attribute the commit to whatever pushed it. Falls back to github-actions[bot] when the
           # App is not configured and GITHUB_TOKEN did the push.
