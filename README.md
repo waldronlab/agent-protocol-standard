@@ -124,8 +124,9 @@ drifted a merge behind `main` before anyone noticed.
 
 Releases are now a record rather than a distribution channel: the template consumes the actions at
 `@main`, so nothing is waiting on a tag to move. The versioned `v0.x.y` release tags remain the thing
-to reference if you have a reason to hold a fixed version — `v0` itself is not one, since it moves on
-every release and is therefore no more fixed than `main`. Note that a release tag is only fixed by
+to reference if you have a reason to hold a fixed version — `v0` itself is not one, since it is
+retargeted onto every qualifying release (see Releasing below for which ones qualify) and is
+therefore no more fixed than `main`. Note that a release tag is only fixed by
 convention: a git tag can be retargeted, so a commit SHA is still the only genuinely immutable
 reference.
 

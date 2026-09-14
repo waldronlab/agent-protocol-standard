@@ -5,6 +5,8 @@
 - **Deciders:** Levi Waldron (User), AI Agent
 - **Supersedes:** [0002. Combined Registry and Protocols Repository](0002-combined-registry-and-protocols.md), in part
 
+> **Amended by the template's move to `@main` (2026-09-14).** §3 below describes content repositories consuming the actions pinned to a release tag. The shipped template references `@main` instead, so that a node cannot validate against a standard older than the one it claims to follow. The argument for distributing the tooling rather than vendoring it is unaffected. Whether a federated node should ever pin is deliberately left open; see the matching note on ADR 0011.
+
 ## Context and Problem Statement
 
 ADR 0002 deliberately combined the federation registry with the Waldron Lab's own protocols in a

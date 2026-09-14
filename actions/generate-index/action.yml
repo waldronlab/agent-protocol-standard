@@ -33,6 +33,13 @@ inputs:
       associate the commit with the bot.
     required: false
     default: 'github-actions[bot]@users.noreply.github.com'
+  ref:
+    description: >-
+      The ref the index describes, used to build protocol_url values. Set this when the caller pins
+      its checkout to a branch — otherwise the generator infers the ref from the event, and a manual
+      dispatch from another branch would index this tree under that ref's URLs.
+    required: false
+    default: ''
   python-version:
     description: 'Python version to install.'
     required: false
@@ -52,6 +59,10 @@ runs:
 
     - name: Generate index
       shell: bash
+      env:
+        # Deliberately not GITHUB_REF_NAME: that is runner-provided and a workflow cannot reliably
+        # override it. detect_ref() checks this first.
+        PROTOCOL_INDEX_REF: ${{ inputs.ref }}
       run: |
         python3 "$GITHUB_ACTION_PATH/../../scripts/generate_protocols_yaml.py" \
           "${{ inputs.protocols-path }}" "${{ inputs.output }}"
@@ -84,6 +95,10 @@ runs:
         # index commit touches one generated file, so it rebases cleanly unless something else
         # edited the same file — and that case should fail loudly rather than be forced through.
         branch="$(git rev-parse --abbrev-ref HEAD)"
+        if [ "$branch" = "HEAD" ]; then
+          echo "::error::detached HEAD — check out a branch before generating the index"
+          exit 1
+        fi
         for attempt in 1 2 3; do
           if git push origin "HEAD:$branch"; then
             exit 0
