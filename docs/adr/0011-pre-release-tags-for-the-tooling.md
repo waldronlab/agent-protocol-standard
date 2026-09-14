@@ -5,7 +5,16 @@
 - **Deciders:** Levi Waldron (User), AI Agent
 - **Amends:** [ADR-0009](0009-name-metadata-fields-by-what-they-identify.md) — settles the tag question it raised and deferred
 
-> **Amended by the template's move to `@main` (2026-09-14).** The consequence below that "consumers must reference `@v0`" no longer describes the shipped template, which references `@main` so that a node cannot validate against a standard older than the one it claims to follow. `@v0` still exists and still moves on release. Whether a federated node should ever pin is deliberately left open; if it settles, it warrants an ADR superseding this consequence and ADR 0006 §3.
+> **Amended by the template's move to `@main` (2026-09-14).** Everything below about what a *consumer*
+> should reference is historical — the Decision's "`@v0` keeps the moving-tag behaviour… a consumer that
+> cannot accept this pins a release tag", and the Consequences' "Consumers must reference `@v0`… a new
+> repository starts on `@v0`". The shipped template references `@main`, so that a node cannot validate
+> against a standard older than the one it claims to follow.
+>
+> What still stands is this ADR's actual subject: the tooling is versioned `v0.x`, `@v0` exists and is
+> retargeted onto qualifying releases, and the two version axes are separate. Whether a federated node
+> should ever pin is deliberately left open; if it settles, it warrants an ADR superseding these
+> consequences and ADR 0006 §3.
 
 ## Context and Problem Statement
 
