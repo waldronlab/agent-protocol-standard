@@ -56,16 +56,19 @@ Then:
 2. Add a `LICENSE`. The template deliberately ships none, because the choice is yours; its README
    suggests the arrangement this project uses (CC-BY-4.0 for protocols, MIT for everything else)
    without assuming it.
-3. **If `main` is protected, add a deploy key so the index can be written.** A ruleset requiring
-   pull requests blocks `github-actions[bot]`, and Actions cannot be granted a bypass — bypass
-   actors of type `Integration` must be GitHub Apps installed on the organisation, and Actions is
-   not one. Generate a keypair, add the public key under **Settings → Deploy keys** with write
-   access, and add `DeployKey` as a bypass actor on the ruleset. Hold the private key as an
-   **environment** secret named `INDEX_DEPLOY_KEY`, in an environment called `index-generation`
-   whose deployment branch policy allows only `main` — a repository secret would be readable from a
-   pull request branch, since same-repo pull requests do receive secrets, and this key bypasses the
-   protection you just configured. The template's workflow already declares the environment and
-   passes the secret to `actions/checkout`.
+3. **If `main` is protected, create a GitHub App so the index can be written.** A ruleset requiring
+   pull requests blocks `github-actions[bot]`, and GitHub Actions itself cannot be granted a bypass —
+   bypass actors of type `Integration` must be GitHub Apps installed on the organisation, and Actions
+   is not one. A purpose-built App is. Create one owned by your organisation with **Contents: Read and
+   write** and no other permission, install it on this repository only, and add it as a bypass actor
+   on the ruleset. Its tokens expire after an hour, which a deploy key's would not.
+
+   Hold its App ID and private key as **environment** secrets named `INDEX_APP_ID` and
+   `INDEX_APP_PRIVATE_KEY`, in an environment called `index-generation` whose deployment branch policy
+   allows only `main`. Repository secrets would be readable from a pull request branch — same-repo
+   pull requests do receive secrets — and these mint a token that bypasses the protection you just
+   configured. The template's workflow already declares the environment and passes both to
+   `actions/create-github-app-token`.
 4. Push to `main` and let the index generate.
 5. **Open a pull request adding your repository to [`registry.yaml`](registry.yaml).** Until that
    entry exists nothing points at your index, so no agent will ever fetch it — a repository with a
