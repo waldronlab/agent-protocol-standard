@@ -1,6 +1,10 @@
 name: Generate Protocol Index
 
 on:
+  # Tracking the generator at @main means the next run uses it — but a generator change upstream
+  # raises no event here, so nothing regenerates until a local change does. Run this by hand after
+  # a generator change you care about, or add a `schedule:` if you would rather it reconcile itself.
+  workflow_dispatch:
   push:
     branches: [main]
     # The index is a function of the protocols *and* of the generator, so a change to this
@@ -57,6 +61,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ steps.app-token.outputs.token || github.token }}
+          # The branch tip, not the event SHA. Serialising runs is not enough on its own: a queued
+          # run would still check out the commit that triggered it, and push a non-fast-forward once
+          # `main` had moved. It also means the index describes `main` as it is, not as it was.
+          ref: main
       # The email prefix below is the bot's user id, which is NOT the App registration id held in
       # INDEX_APP_ID. Getting it wrong still pushes, but GitHub does not link the commit to the bot.
       - name: Resolve the App's bot user id
@@ -65,7 +73,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SLUG: ${{ steps.app-token.outputs.app-slug }}
-        run: echo "id=$(gh api "/users/${SLUG}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        run: |
+          # Assigned separately, not interpolated into echo: `echo "id=$(gh api ...)"` exits 0 even
+          # when the lookup fails, writing an empty id, and attribution then falls back silently.
+          set -euo pipefail
+          id="$(gh api "/users/${SLUG}[bot]" --jq .id)"
+          [ -n "$id" ] || { echo "::error::could not resolve the bot user id for ${SLUG}[bot]"; exit 1; }
+          echo "id=$id" >> "$GITHUB_OUTPUT"
 
       # Deliberately @main rather than a release tag. A generator that has fallen behind produces an
       # index that disagrees with the standard it claims to follow, and does so silently — CI stays

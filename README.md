@@ -37,7 +37,7 @@ Some likely use cases include:
 Protocol repositories federate into the registry here, and need no copy of the tooling: validation
 and index generation are published from this repository as GitHub composite actions, so both stay in
 lockstep with [`PROTOCOL_STANDARD.md`](PROTOCOL_STANDARD.md). The template references them at
-`@main`; see [below](#the-template-references-main-not-a-release-tag-and-that-is-deliberate).
+`@main`; see [below](#the-template-references-main-not-a-release-tag).
 
 **Copy the contents of [`template/`](template/) into a new empty repository.** It is a complete
 content node: the two workflows, a README and CONTRIBUTING that name this standard as the authority
@@ -80,7 +80,9 @@ Neither hardcodes a repository name: `protocol_url` values are built from the re
 runs in, so nothing in the template needs editing to point at you.
 Both also take `python-version` (default `3.11`).
 
-**The template references `@main`, not a release tag, and that is deliberate.** A node validating
+### The template references `@main`, not a release tag
+
+A node validating
 against a snapshot conforms to a version of the standard nobody publishes any more, and the failure
 is silent: a green check produced by a validator older than the rule it claims to enforce. Tracking
 `main` means a change that breaks you breaks you loudly, at a time when the spec is `0.y.z` and says
@@ -121,8 +123,9 @@ it, so nothing needs moving by hand — which is what the first four releases re
 drifted a merge behind `main` before anyone noticed.
 
 Releases are now a record rather than a distribution channel: the template consumes the actions at
-`@main`, so nothing is waiting on a tag to move. `v0` is kept for anyone who has a reason to pin, and
-because the drift it accumulates is a useful signal of how far behind a pinned consumer would be.
+`@main`, so nothing is waiting on a tag to move. The immutable `v0.x.y` release tags remain the thing
+to reference if you have a reason to hold a fixed version — `v0` itself is not one, since it moves on
+every release and is therefore no more fixed than `main`.
 
 The workflow declines to move the tag, with a notice rather than a failure, for a pre-release, for a
 tag that is not `vX.Y.Z`, and for a release that is not the highest on its line — so republishing an
