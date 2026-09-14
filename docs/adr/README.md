@@ -18,5 +18,6 @@ This directory contains Architecture Decision Records (ADRs) for the `agent-prot
 - [0012. Require Materials, Steps, and a Resolvable Citation](0012-require-materials-steps-and-a-resolvable-citation.md)
 - [0013. `stable` Is an Assertion by the Authors](0013-stable-is-an-assertion-by-the-authors.md)
 - [0014. Ask Two Citation Questions, and Require the Answerable One](0014-two-citation-questions.md) — amends 0009 and 0012
+- [0015. Migrate Protocol Validator to Python and Pydantic](0015-migrate-validator-to-python.md)
 
 

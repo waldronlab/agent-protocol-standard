@@ -5,12 +5,12 @@ This repository contains the `agent-protocol-standard` schema definitions, the P
 ## Technical Stack
 - **Language**: Python 3.10+
 - **Validation**: [Pydantic](https://docs.pydantic.dev/) for declarative schema definitions.
-- **Testing**: [Pytest](https://docs.pytest.org/) for the in-memory test suite.
+- **Testing**: [Pytest](https://docs.pytest.org/) for model, fixture, and CLI validation.
 
 ## Local Setup
 To run tests locally, install Python and the required dependencies:
 ```bash
-pip install pytest pydantic pyyaml
+pip install pytest "pydantic>=2.0.0" pyyaml
 ```
 
 ## Running Tests
@@ -21,7 +21,7 @@ pytest tests/
 
 ## Modifying the Schema
 
-The protocol schema is defined entirely in `scripts/models.py` using Pydantic. 
+The protocol frontmatter schema is defined in `scripts/models.py` using Pydantic. Document-level checks (like Materials/Steps and History & Reviews) are implemented in `scripts/validate_protocol.py`. 
 
 ### Adding a New Field
 To add a new field to the protocol frontmatter, add it as a class attribute to the `ProtocolFrontmatter` class in `scripts/models.py`. Pydantic handles type coercion and basic validation automatically.
@@ -53,7 +53,7 @@ class ProtocolFrontmatter(BaseModel):
 
 ## Testing Validation Changes
 
-Because we use Pydantic, testing validation rules does not require writing markdown files to disk or dealing with fragile string manipulation. You test rules entirely in-memory by passing dictionaries to the models.
+Because we use Pydantic, testing Pydantic frontmatter rules does not require writing markdown files to disk or dealing with fragile string manipulation. You test rules entirely in-memory by passing dictionaries to the models.
 
 Add your tests to `tests/test_models.py`:
 
@@ -64,16 +64,18 @@ from scripts.models import ProtocolFrontmatter
 
 def test_composite_requires_dependencies():
     # 1. Start with a valid baseline dictionary
-    bad_dict = {**baseline_dict}
+    bad_dict = {**valid_dict()}
     
     # 2. Mutate it to trigger the failure state
     bad_dict["type"] = "composite"
     bad_dict["protocols_used"] = []
     
     # 3. Assert that Pydantic rejects it with the expected error message
-    with pytest.raises(ValidationError, match="Composite protocols must declare 'protocols_used'"):
+    with pytest.raises(ValidationError, match="'type: composite' requires a non-empty 'protocols_used'"):
         ProtocolFrontmatter(**bad_dict)
 ```
 
-## Updating the Template
-If your schema change adds a new required field, ensure you also update `template/protocols/example-protocol/protocol.md` and `template/protocols/example-composite/protocol.md` so that future protocols scaffolded from the template do not immediately fail validation.
+## Updating the Template and Fixtures
+If your schema change adds a new required field, ensure you also update `template/protocols/example-protocol/protocol.md` so that future protocols scaffolded from the template do not immediately fail validation.
+
+Additionally, update the valid fixtures in `tests/fixtures/valid/` and any affected content-repository protocols, otherwise CI will fail when validating existing protocols against the new schema.

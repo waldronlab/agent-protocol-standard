@@ -1,7 +1,8 @@
-# ADR 1: Migrate Protocol Validator to Python and Pydantic
+# 0015. Migrate Protocol Validator to Python and Pydantic
 
-**Date:** 2026-09-13
-**Status:** Accepted
+- **Status:** Accepted
+- **Date:** 2026-09-13
+- **Deciders:** Levi Waldron (User), AI Agent
 
 ## Context
 The `agent-protocol-standard` repository defines the schema for AI agent protocols. Initially, the validator and its test suite were written in R. This aligned perfectly with the lab's primary domain expertise in R and the Bioconductor ecosystem, ensuring that existing contributors could easily read and maintain the repository's infrastructure.
@@ -13,11 +14,14 @@ However, R lacks a mainstream, declarative data-validation library equivalent to
 ## Decision
 We will transition the `agent-protocol-standard` validator and its test suite from R to Python. We will use **Pydantic** to define the schema declaratively, and **Pytest** to run the test suite.
 
+## Alternatives Considered
+- **Keep the R implementation:** This would require continuing to maintain a custom validation script and fragile string manipulation in tests. Rejected because the maintenance burden and risk of regressions was too high for a standard that requires strict schema enforcement.
+
 ## Consequences
 
 ### Positive
 *   **Declarative Simplicity:** Complex validation logic (e.g., cross-field dependencies, type checking) is now handled natively by Pydantic. The core logic was reduced from ~800 lines of procedural R to ~160 lines of declarative Python.
-*   **Robust Testing:** Testing is now performed in-memory on Python dictionaries (e.g., `Protocol(**bad_dict)`), completely eliminating the need for fragile string manipulation and disk I/O.
+*   **Robust Testing:** Testing is now performed in-memory on Python dictionaries (e.g., `ProtocolFrontmatter(**bad_dict)`), reducing the need for fragile string manipulation and disk I/O for frontmatter validation.
 *   **Speed:** The test suite executes in a fraction of the time.
 
 ### Negative / Trade-offs
