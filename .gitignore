@@ -1,2 +1,4 @@
 .gemini
 .claude/
+__pycache__/
+*.pyc
