@@ -18,6 +18,18 @@ inputs:
     description: 'Commit message used when the index changes.'
     required: false
     default: 'chore: Update PROTOCOLS.yaml [skip ci]'
+  committer-name:
+    description: >-
+      Name recorded as the commit author. Defaults to github-actions[bot]; pass the identity of
+      whatever credential actually pushes, so the commit and the push agree about who made it.
+    required: false
+    default: 'github-actions[bot]'
+  committer-email:
+    description: >-
+      Email recorded as the commit author. For a GitHub App this is
+      <app-id>+<app-slug>[bot]@users.noreply.github.com.
+    required: false
+    default: 'github-actions[bot]@users.noreply.github.com'
   python-version:
     description: 'Python version to install.'
     required: false
@@ -41,19 +53,22 @@ runs:
         python3 "$GITHUB_ACTION_PATH/../../scripts/generate_protocols_yaml.py" \
           "${{ inputs.protocols-path }}" "${{ inputs.output }}"
 
-    # Pushes over whatever the caller's checkout configured. Where `main` is protected, the caller
-    # passes a write-scoped deploy key to actions/checkout via its `ssh-key` input, which sets the
-    # remote to SSH; GITHUB_TOKEN cannot push past a ruleset that requires pull requests.
+    # Pushes over whatever credential the caller's checkout configured. Where `main` is protected,
+    # the caller mints a GitHub App installation token and passes it to actions/checkout via its
+    # `token` input; GITHUB_TOKEN cannot push past a ruleset that requires pull requests, and
+    # GitHub Actions itself cannot be granted a ruleset bypass.
     #
-    # This cannot loop. A deploy-key push does trigger workflows (a GITHUB_TOKEN push does not), but
-    # the commit touches only the index, which is outside the caller's `paths:` filter, and the
-    # default commit message carries [skip ci] as well.
+    # Loop protection is the CALLER'S responsibility, not this action's. A push authenticated by
+    # anything other than GITHUB_TOKEN does trigger workflows, so a caller that re-runs on its own
+    # index commit will loop. The template guards this twice — the commit touches only the index,
+    # which sits outside its `paths:` filter, and the default commit-message carries [skip ci] — but
+    # a caller with neither, or with a custom commit-message, must supply an equivalent guard.
     - name: Commit and push changes
       if: inputs.commit == 'true'
       shell: bash
       run: |
-        git config --local user.name "github-actions[bot]"
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "${{ inputs.committer-name }}"
+        git config --local user.email "${{ inputs.committer-email }}"
         git add "${{ inputs.output }}"
         if git diff --staged --quiet; then
           echo "No changes to commit"
