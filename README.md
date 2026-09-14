@@ -79,11 +79,21 @@ Neither hardcodes a repository name: `protocol_url` values are built from the re
 runs in, so nothing in the template needs editing to point at you.
 Both also take `python-version` (default `3.11`).
 
-`@v0` is a moving tag, so your repository tracks the standard without a pull request per release —
-which is the point, since a validator that has fallen behind means silently enforcing an older
-standard than you claim to follow. To hold a fixed version instead, pin the release tag `@v0.3.1`
-and update it by hand — or, since a git tag can itself be retargeted, pin a commit SHA, which is the
-only genuinely immutable reference. Note that `generate-index` runs with `contents: write`.
+**The template references `@main`, not a release tag, and that is deliberate.** A node validating
+against a snapshot conforms to a version of the standard nobody publishes any more, and the failure
+is silent: a green check produced by a validator older than the rule it claims to enforce. Tracking
+`main` means a change that breaks you breaks you loudly, at a time when the spec is `0.y.z` and says
+so.
+
+This is a live question rather than a settled one. Pinning is the ordinary answer for a *library*,
+where a consumer reasonably freezes a dependency; it is a stranger answer for a *standard*, where
+conforming to last year's version is not obviously conformance at all. If you have a reason to pin —
+a node you cannot update promptly, say — pin a commit SHA rather than a tag, since a tag can itself
+be retargeted, and tell us, because the answer should be driven by what federated nodes actually
+need.
+
+Note that `generate-index` runs with `contents: write` where no App is configured, since GITHUB_TOKEN
+does the push in that case.
 
 ## Development
 

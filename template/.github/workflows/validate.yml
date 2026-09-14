@@ -10,4 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: waldronlab/agent-protocol-standard/actions/validate-protocols@v0
+      # Deliberately @main rather than a release tag: validating against a snapshot of the standard
+      # means conforming to a version of it nobody publishes any more, and the failure is silent —
+      # a green check produced by a validator older than the rule it claims to enforce.
+      - uses: waldronlab/agent-protocol-standard/actions/validate-protocols@main
