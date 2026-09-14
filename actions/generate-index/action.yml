@@ -41,6 +41,13 @@ runs:
         python3 "$GITHUB_ACTION_PATH/../../scripts/generate_protocols_yaml.py" \
           "${{ inputs.protocols-path }}" "${{ inputs.output }}"
 
+    # Pushes over whatever the caller's checkout configured. Where `main` is protected, the caller
+    # passes a write-scoped deploy key to actions/checkout via its `ssh-key` input, which sets the
+    # remote to SSH; GITHUB_TOKEN cannot push past a ruleset that requires pull requests.
+    #
+    # This cannot loop. A deploy-key push does trigger workflows (a GITHUB_TOKEN push does not), but
+    # the commit touches only the index, which is outside the caller's `paths:` filter, and the
+    # default commit message carries [skip ci] as well.
     - name: Commit and push changes
       if: inputs.commit == 'true'
       shell: bash

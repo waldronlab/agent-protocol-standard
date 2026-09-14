@@ -42,8 +42,8 @@ lockstep with [`PROTOCOL_STANDARD.md`](PROTOCOL_STANDARD.md). Pin them to a rele
 content node: the two workflows, a README and CONTRIBUTING that name this standard as the authority
 on format, and a starter protocol at `protocols/example-protocol/protocol.md` to rename and edit.
 
-The starter conforms in every respect but one: its `method_origin_citation` is the placeholder
-`10.0000/replace-with-a-real-doi` in the required `protocol_citation`, which the validator rejects by name. **Your first CI run is red
+The starter conforms in every respect but one: its required `protocol_citation` is the placeholder
+`10.0000/replace-with-a-real-doi`, which the validator rejects by name. **Your first CI run is red
 until you replace it**, deliberately — a real citation is the one thing the template cannot supply,
 and it is DOI-shaped, so nothing but naming it would catch a template copied as-is. This
 repository's own test suite asserts the starter fails on exactly that and nothing else, so it still
@@ -56,8 +56,14 @@ Then:
 2. Add a `LICENSE`. The template deliberately ships none, because the choice is yours; its README
    suggests the arrangement this project uses (CC-BY-4.0 for protocols, MIT for everything else)
    without assuming it.
-3. Push to `main` and let the index generate.
-4. **Open a pull request adding your repository to [`registry.yaml`](registry.yaml).** Until that
+3. **If `main` is protected, add a deploy key so the index can be written.** A ruleset requiring
+   pull requests blocks `github-actions[bot]`, and Actions cannot be granted a bypass — bypass
+   actors of type `Integration` must be GitHub Apps installed on the organisation, and Actions is
+   not one. Generate a keypair, add the public key under **Settings → Deploy keys** with write
+   access, add the private key as the `INDEX_DEPLOY_KEY` secret, and add `DeployKey` as a bypass
+   actor on the ruleset. The template's workflow already passes the secret to `actions/checkout`.
+4. Push to `main` and let the index generate.
+5. **Open a pull request adding your repository to [`registry.yaml`](registry.yaml).** Until that
    entry exists nothing points at your index, so no agent will ever fetch it — a repository with a
    perfectly valid `PROTOCOLS.yaml` is still invisible.
 
