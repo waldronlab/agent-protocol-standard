@@ -20,8 +20,9 @@ run leaves behind.
 ### 1. A test is a directory
 
 `protocols/<name>/tests/<test-name>/` holds `test.yaml` and any local data files. `test.yaml` has
-five keys: `name` (matching the directory), `description`, `inputs`, `expected_outputs`, and
-`evaluation`. A file is always a mapping, `{path: ...}` inside the test directory or `{url: ...,
+`name` (matching the directory), `description`, `inputs`, and `evaluation`; in `exact` mode it also
+has `expected_outputs` at the top level, and in `diagnostic` mode the expectations sit under each
+accepted outcome instead. A file is always a mapping, `{path: ...}` inside the test directory or `{url: ...,
 sha256: ...}` for data too large to commit, so that a bare string is never mistaken for one. The
 full schema is in `PROTOCOL_STANDARD.md`.
 
@@ -29,9 +30,14 @@ full schema is in `PROTOCOL_STANDARD.md`.
 
 `exact`: every entry in `expected_outputs` must match the result, numbers within
 `numeric_tolerance`. `diagnostic`: the executor must reach one of the listed `accepted_outcomes`,
-each of which may carry its own `expected_outputs`. The second mode exists for inputs that violate
-the protocol's stated requirements, where refusing and repairing are both correct and silently
-proceeding is the failure.
+each of which carries checkable evidence: `expected_outputs`, or `expected_absent` for a refusal,
+which the checker verifies by the absence of the protocol's outputs. A label alone is not evidence.
+The second mode exists for inputs that violate the protocol's stated requirements, where refusing
+and repairing are both correct and silently proceeding is the failure.
+
+Tables are CSV only, and the first column is an identifier compared as a string. Both are the
+simplest rule that fits the existing fixtures; a second format or a per-column type declaration
+waits for a test that needs one.
 
 Custom evaluation scripts, proposed in #3, are not defined. Nothing needs them yet.
 

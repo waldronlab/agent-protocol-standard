@@ -332,9 +332,15 @@ local files small.
 **`exact`**: every entry in `expected_outputs` must be present in the result and match.
 
 **`diagnostic`**: the input violates a requirement the protocol states, and the test checks what the
-executor does about it. `evaluation.accepted_outcomes` lists the outcomes that count as correct;
-each may carry its own `expected_outputs`, compared as in `exact` mode when the executor reports
-that outcome. The top-level `expected_outputs` is omitted.
+executor does about it. `evaluation.accepted_outcomes` lists the outcomes that count as correct.
+The top-level `expected_outputs` is omitted; each outcome carries its own evidence instead, at
+least one of:
+
+*   `expected_outputs`, compared as in `exact` mode when the executor reports that outcome;
+*   `expected_absent`, keys that must not appear in the result. This is how a refusal is checked:
+    an executor that refused did not produce the protocol's outputs.
+
+An outcome with neither is invalid, because a label alone is the executor's word.
 
 ```yaml
 evaluation:
@@ -345,6 +351,7 @@ evaluation:
         removed_features: [A, B]
         retained_features: [C, D, E]
     - outcome: refused_for_orientation
+      expected_absent: [removed_features, retained_features, retained_matrix]
 ```
 
 ### The result contract
@@ -367,9 +374,15 @@ thing that decides pass or fail. Its rules:
 *   Numbers match within `numeric_tolerance`. Strings, booleans and nulls match exactly. Lists match
     element by element, in order. Mappings match key by key; a key missing from the result fails,
     a key present only in the result is ignored.
-*   Files are compared as tables: the same header, the same rows in the same order, each cell
-    numeric within tolerance where both parse as numbers and equal as strings otherwise. An empty
-    cell is a missing value and matches only an empty cell.
+*   Files are compared as tables. The only table format is CSV: UTF-8, comma delimited, double-quote
+    quoting as in RFC 4180, with a header row. A file slot compared as a table must have a name
+    ending in `.csv`, in `path` or in the URL; the validator rejects anything else, and no other
+    file format is defined yet.
+*   Two tables match when the header rows are identical as strings, the rows are in the same order,
+    and every cell matches. The first column is the row identifier and is compared as a string, as
+    is the header, so `001` and `1` differ. In every other column a cell is numeric, within
+    tolerance, when the expected cell parses as a number, and a string otherwise. An empty cell is a
+    missing value and matches only an empty cell.
 
 ### The run record
 
@@ -377,13 +390,17 @@ A run is not a review and adds nothing to the protocol. The checker writes `run.
 result directory:
 
 ```yaml
+run_record: 1                   # schema version of this record
 protocol: independent-filtering-variance
 version: 1.2.1
 repository: waldronlab/agent-protocols
-date: 2026-10-18
+protocol_commit: 844ce92        # commit the protocol and tests were read at
+started: 2026-10-18T14:02:11Z   # UTC timestamps, from the executor
+finished: 2026-10-18T14:09:40Z
 executor:
   agent: claude-code            # the agent or person that performed the protocol
   model: claude-fable-5-1       # omitted for a human executor
+  language: R                   # what the execution was written in, if known
 checker: check_test_result.py 0.1.0
 tests:
   - name: variance_rows
@@ -392,6 +409,11 @@ tests:
     result: pass
     outcome: orientation_corrected   # diagnostic mode only
 ```
+
+The executor supplies the `executor` block and timestamps; the checker fills the rest. Additional
+keys, at the top level or under `executor`, are permitted and preserved, so a study that records
+cost, token counts, attempts, or an experimental condition adds them without a schema change.
+`run_record` is incremented when a defined key changes meaning.
 
 Where run records are kept is not yet defined (issue #44). Attach the record to the pull request or
 issue it is relevant to.
