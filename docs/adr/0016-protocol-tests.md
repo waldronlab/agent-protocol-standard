@@ -12,8 +12,8 @@ be checked against known inputs and expected outputs. The first protocol with te
 ahead of any schema. Their `test.yaml` files agree on `inputs`, `expected_outputs`, and `evaluation`
 but improvise the rest, and nothing validates or runs them.
 
-Three things were undefined: the shape of a test, the shape of the thing a test checks, and where a
-run is recorded.
+Three things were undefined: the shape of a test, the shape of the thing a test checks, and what a
+run leaves behind.
 
 ## Decision
 
@@ -48,20 +48,25 @@ mode, and outcome labels of the test with every expected value withheld, printed
 It does not read `expected_outputs` itself. Without the shape a correct execution could fail on
 a key name; with the values it would not be a test.
 
-### 4. A run is recorded as a review
+### 4. A run produces a run record, not a review
 
-A passing run is recorded as a review with status `verified-with-benchmark`, whose Notes name the
-executing agent, the model, and the number of tests passed. ADR 0005 defined the status as "executed
-the protocol and verified the outputs against a benchmark or expected result", and that definition
-stands: a reviewer who verified against their own data records the same status. The tests are the
-reproducible form of that benchmark, and the first thing that produces the status routinely. No new
-frontmatter field, no CI credential: anyone runs the tests on their own machine with their own agent
-and records what happened.
+A review is a named person's judgement of a protocol. A run is a fact about one execution: which
+agent, which model, which day, which tests passed. There will be many runs per version and they
+say something different, so a run is not a review and nothing is added to the protocol when one
+completes.
 
-This is also where two open questions land. #22 proposes that trust tier 4 mean "registered, and
-the current version carries a `verified-with-benchmark` review"; a recorded run is the evidence that
-tier would read. #10 asks the runner to surface review status at selection time; a recorded run is
-what it would surface.
+The checker writes a run record, `run.yaml`, naming the protocol and version, each test with its
+result, the executing agent and model, the date, and the checker version. The format is in
+`PROTOCOL_STANDARD.md` because the checker produces it. Where run records are kept is deferred to
+#44: while runs are few, the person attaches the record to the pull request or issue they are
+working on, and a collection is defined when the benchmarking study in #5 produces volume.
+
+`verified-with-benchmark` keeps its ADR 0005 meaning. A human who has run the tests, or their own
+benchmark, may record it once, as a judgement, citing the run record in Notes. No CI credential
+and no automatic review: anyone runs the tests on their own machine with their own agent.
+
+#22 proposes that trust tier 4 read that review, and #10 asks the runner to surface it. Both
+continue to read reviews; neither reads run records.
 
 ### 5. CI validates tests, it does not run them
 
@@ -91,5 +96,6 @@ shared cost and a shared credential; see item 4.
   conforms, this one checks an execution gets the right answer.
 - The benchmarking study in #5 needs this harness and nothing in it conflicts with #5's design.
 - A checker script, `scripts/check_test_result.py`, is the only code that decides pass or fail.
-- Running a protocol's tests becomes one way to earn `verified-with-benchmark`, with the same
-  meaning the status has had since ADR 0005.
+- Running a protocol's tests becomes one way for a reviewer to earn `verified-with-benchmark`,
+  with the same meaning the status has had since ADR 0005.
+- Run records accumulate outside the protocol; their home is #44.

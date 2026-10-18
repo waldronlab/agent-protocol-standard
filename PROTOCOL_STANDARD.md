@@ -371,13 +371,35 @@ thing that decides pass or fail. Its rules:
     numeric within tolerance where both parse as numbers and equal as strings otherwise. An empty
     cell is a missing value and matches only an empty cell.
 
-### Recording a run
+### The run record
 
-A run in which every test passes is recorded as a review with status `verified-with-benchmark`
-(see Review Statuses above). The Notes name the executing agent and model, and the count of tests
-passed. A reviewer who verified the protocol against their own data records the same status; the
-tests are the reproducible form of that benchmark. A run with failures is not recorded as a review;
-it is a bug report against the protocol or the test.
+A run is not a review and adds nothing to the protocol. The checker writes `run.yaml` into the
+result directory:
+
+```yaml
+protocol: independent-filtering-variance
+version: 1.2.1
+repository: waldronlab/agent-protocols
+date: 2026-10-18
+executor:
+  agent: claude-code            # the agent or person that performed the protocol
+  model: claude-fable-5-1       # omitted for a human executor
+checker: check_test_result.py 0.1.0
+tests:
+  - name: variance_rows
+    result: pass                # pass | fail
+  - name: mean_columns
+    result: pass
+    outcome: orientation_corrected   # diagnostic mode only
+```
+
+Where run records are kept is not yet defined (issue #44). Attach the record to the pull request or
+issue it is relevant to.
+
+A reviewer who has run the tests may record a `verified-with-benchmark` review (see Review Statuses
+above), citing the run record in Notes. That is a judgement by a named person, made once; it is not
+made automatically and not made per run. A run with failures is a bug report against the protocol
+or the test.
 
 CI validates each `test.yaml` against this schema and checks that local files exist. It does not
 fetch remote files or execute tests. The `test-protocol` skill in this repository implements the
