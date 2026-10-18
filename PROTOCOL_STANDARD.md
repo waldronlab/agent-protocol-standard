@@ -357,9 +357,11 @@ evaluation:
 ### The result contract
 
 An executor, human or agent, is given `protocol.md`, `inputs`, and the **result shape**: the
-keys, nesting, and file slots of `expected_outputs` with every value withheld, the evaluation mode,
-and in `diagnostic` mode the outcome labels. `scripts/check_test_result.py --shape <test directory>`
-prints it. The executor performs the protocol in any language and writes `result.yaml` into a result
+keys and nesting of `expected_outputs` with every value withheld, each file slot with its format
+and, for a table, its header row in order, the evaluation mode, and in `diagnostic` mode the
+outcome labels with the keys each one expects present or absent.
+`scripts/check_test_result.py --shape <test directory>` prints it. Data rows and scalar values are
+never included. The executor performs the protocol in any language and writes `result.yaml` into a result
 directory of its choosing. It does not read `expected_outputs` itself.
 
 *   In `exact` mode, `result.yaml` has one key per key of `expected_outputs`. A file slot is filled
@@ -410,10 +412,13 @@ tests:
     outcome: orientation_corrected   # diagnostic mode only
 ```
 
-The executor supplies the `executor` block and timestamps; the checker fills the rest. Additional
-keys, at the top level or under `executor`, are permitted and preserved, so a study that records
-cost, token counts, attempts, or an experimental condition adds them without a schema change.
-`run_record` is incremented when a defined key changes meaning.
+The executor writes `executor.yaml` into the result directory before invoking the checker,
+containing the `executor` block and the `started` and `finished` timestamps; the checker copies
+them into the record and fills the rest from the test directory and its own version. A missing
+`executor.yaml` is an error, not a guess. Additional keys, at the top level of `executor.yaml` or
+under `executor`, are permitted and preserved, so a study that records cost, token counts,
+attempts, or an experimental condition adds them without a schema change. `run_record` is
+incremented when a defined key changes meaning.
 
 Where run records are kept is not yet defined (issue #44). Attach the record to the pull request or
 issue it is relevant to.
