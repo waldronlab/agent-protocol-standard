@@ -277,6 +277,108 @@ A brand-new protocol, or a release nobody has reviewed yet, still carries the se
 
 These rules are enforced by `scripts/validate_protocol.py`, which runs on every pull request.
 
+## Tests
+
+A protocol may carry tests: known inputs with the outputs a correct execution produces. Tests are
+optional. When present they live beside the protocol, one directory per test:
+
+```text
+protocols/<name>/
+├── protocol.md
+└── tests/
+    └── <test-name>/
+        ├── test.yaml
+        ├── input.csv        # local data referenced from test.yaml
+        └── retained.csv     # an expected output file
+```
+
+### `test.yaml`
+
+```yaml
+name: variance_rows                 # must match the directory name
+description: Unbiased variance filtering with features in rows.
+inputs:                             # everything the executor is given
+  data: input.csv                   # a file: relative path, or url + sha256 (below)
+  filter: variance
+  theta: 0.4
+expected_outputs:                   # what a correct execution produces
+  summary:
+    A: 0
+    B: 1.3333333333333333
+  removed_features: [A, B]
+  retained_matrix: retained.csv     # a file, compared as a table
+evaluation:
+  mode: exact                       # exact | diagnostic
+  numeric_tolerance: 1.0e-12        # optional, default 0
+```
+
+*   `name`: (String) Kebab or snake case; must equal the directory name.
+*   `description`: (String) One sentence.
+*   `inputs`: (Mapping) Parameter values and data files. Keys are the protocol's own parameter
+    names where it has them.
+*   `expected_outputs`: (Mapping) Values and files a correct execution produces. Keys are the
+    quantities the protocol says to record.
+*   `evaluation`: (Mapping) `mode` is required. `numeric_tolerance` is an absolute tolerance applied
+    to every numeric comparison, default `0`.
+
+A **file** is any value that is a relative path inside the test directory (no `..`), or a mapping
+with `url` and `sha256`. The remote form is for data too large to commit; the digest is verified
+after download and a mismatch fails the test. Keep local files small.
+
+### Evaluation modes
+
+**`exact`**: every entry in `expected_outputs` must be present in the result and match.
+
+**`diagnostic`**: the input violates a requirement the protocol states, and the test checks what the
+executor does about it. `evaluation.accepted_outcomes` lists the outcomes that count as correct;
+each may carry its own `expected_outputs`, compared as in `exact` mode when the executor reports
+that outcome. The top-level `expected_outputs` is omitted.
+
+```yaml
+evaluation:
+  mode: diagnostic
+  accepted_outcomes:
+    - outcome: orientation_corrected
+      expected_outputs:
+        removed_features: [A, B]
+        retained_features: [C, D, E]
+    - outcome: refused_for_orientation
+```
+
+### The result contract
+
+An executor, human or agent, reads `protocol.md` and `inputs`, performs the protocol in any language,
+and writes `result.yaml` into a result directory of its choosing. It does not read
+`expected_outputs` first.
+
+*   In `exact` mode, `result.yaml` has one key per key of `expected_outputs`. A file-valued key names
+    a file in the result directory.
+*   In `diagnostic` mode, `result.yaml` has `outcome`, one of the accepted outcomes, and
+    `observation`, one sentence saying what was found. If that outcome carries `expected_outputs`,
+    their keys follow.
+
+`scripts/check_test_result.py <test directory> <result directory>` compares the two and is the only
+thing that decides pass or fail. Its rules:
+
+*   Numbers match within `numeric_tolerance`. Strings, booleans and nulls match exactly. Lists match
+    element by element, in order. Mappings match key by key; a key missing from the result fails,
+    a key present only in the result is ignored.
+*   Files are compared as tables: the same header, the same rows in the same order, each cell
+    numeric within tolerance where both parse as numbers and equal as strings otherwise. An empty
+    cell is a missing value and matches only an empty cell.
+
+### Recording a run
+
+A run in which every test passes is recorded as a review with status `verified-with-benchmark`
+(see Review Statuses above). The Notes name the executing agent and model, and the count of tests
+passed. A reviewer who verified the protocol against their own data records the same status; the
+tests are the reproducible form of that benchmark. A run with failures is not recorded as a review;
+it is a bug report against the protocol or the test.
+
+CI validates each `test.yaml` against this schema and checks that local files exist. It does not
+fetch remote files or execute tests. The `test-protocol` skill in this repository implements the
+result contract for an agent.
+
 ## Example Protocol
 
 ```yaml
