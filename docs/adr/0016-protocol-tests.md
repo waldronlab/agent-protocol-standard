@@ -21,8 +21,9 @@ run is recorded.
 
 `protocols/<name>/tests/<test-name>/` holds `test.yaml` and any local data files. `test.yaml` has
 five keys: `name` (matching the directory), `description`, `inputs`, `expected_outputs`, and
-`evaluation`. A file is referenced by a relative path inside the test directory, or by a mapping of
-`url` and `sha256` for data too large to commit. The full schema is in `PROTOCOL_STANDARD.md`.
+`evaluation`. A file is always a mapping, `{path: ...}` inside the test directory or `{url: ...,
+sha256: ...}` for data too large to commit, so that a bare string is never mistaken for one. The
+full schema is in `PROTOCOL_STANDARD.md`.
 
 ### 2. Two evaluation modes
 
@@ -37,13 +38,15 @@ Custom evaluation scripts, proposed in #3, are not defined. Nothing needs them y
 ### 3. A result contract
 
 The executor writes `result.yaml` into a result directory. Its keys mirror `expected_outputs`;
-file-valued keys name files in the same directory. In diagnostic mode it also carries `outcome` and a
-one-line `observation`. A deterministic checker compares the result to the test. Without this
-contract there is nothing machine-checkable, and the agent's own report of success would be the only
-evidence.
+file slots are filled with `{path: ...}` in the same directory. In diagnostic mode it also carries
+`outcome` and a one-line `observation`. A deterministic checker compares the result to the test.
+Without this contract there is nothing machine-checkable, and the agent's own report of success
+would be the only evidence.
 
-The executor reads `protocol.md` and `inputs` only. It does not read `expected_outputs` before
-writing its result.
+The executor is given `protocol.md`, `inputs`, and the result shape: the keys, nesting, file slots,
+mode, and outcome labels of the test with every expected value withheld, printed by the checker.
+It does not read `expected_outputs` itself. Without the shape a correct execution could fail on
+a key name; with the values it would not be a test.
 
 ### 4. A run is recorded as a review
 
@@ -73,9 +76,10 @@ shared cost and a shared credential; see item 4.
 - **Hash matching of output files**, as #3 proposed for deterministic steps. Rejected as the primary
   mechanism: a trailing newline or a column order fails a correct result. Tables are compared as
   tables, with tolerance.
-- **A `has_tests` flag in `PROTOCOLS.yaml` and the registry**, as #3 proposed. Not needed: the
-  `verified-with-benchmark` review already in the index says more, that the tests exist and passed,
-  and #22 proposes reading it for the trust tier.
+- **A `has_tests` flag in `PROTOCOLS.yaml` and the registry**, as #3 proposed. Deferred to the
+  registry-schema work in #22. Test availability and a passing run are different facts: tests exist
+  before anyone runs them. The review records the run; whether the index should also list the tests
+  is #22's question.
 - **Running tests in CI on every pull request.** Rejected for now, per item 5.
 
 ## Consequences
@@ -87,5 +91,5 @@ shared cost and a shared credential; see item 4.
   conforms, this one checks an execution gets the right answer.
 - The benchmarking study in #5 needs this harness and nothing in it conflicts with #5's design.
 - A checker script, `scripts/check_test_result.py`, is the only code that decides pass or fail.
-- `verified-with-benchmark` acquires a concrete meaning: the named reviewer ran the protocol's
-  tests and they passed.
+- Running a protocol's tests becomes one way to earn `verified-with-benchmark`, with the same
+  meaning the status has had since ADR 0005.

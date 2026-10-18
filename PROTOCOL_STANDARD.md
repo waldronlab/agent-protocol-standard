@@ -298,7 +298,7 @@ protocols/<name>/
 name: variance_rows                 # must match the directory name
 description: Unbiased variance filtering with features in rows.
 inputs:                             # everything the executor is given
-  data: input.csv                   # a file: relative path, or url + sha256 (below)
+  data: {path: input.csv}           # a file: path, or url + sha256 (below)
   filter: variance
   theta: 0.4
 expected_outputs:                   # what a correct execution produces
@@ -306,7 +306,7 @@ expected_outputs:                   # what a correct execution produces
     A: 0
     B: 1.3333333333333333
   removed_features: [A, B]
-  retained_matrix: retained.csv     # a file, compared as a table
+  retained_matrix: {path: retained.csv}   # a file, compared as a table
 evaluation:
   mode: exact                       # exact | diagnostic
   numeric_tolerance: 1.0e-12        # optional, default 0
@@ -321,9 +321,11 @@ evaluation:
 *   `evaluation`: (Mapping) `mode` is required. `numeric_tolerance` is an absolute tolerance applied
     to every numeric comparison, default `0`.
 
-A **file** is any value that is a relative path inside the test directory (no `..`), or a mapping
-with `url` and `sha256`. The remote form is for data too large to commit; the digest is verified
-after download and a mismatch fails the test. Keep local files small.
+A **file** is a mapping with exactly one of two shapes: `{path: <relative path>}`, inside the test
+directory with no `..`, or `{url: <https URL>, sha256: <hex digest>}`. Any other string is a
+literal value, so `data: input.csv` is the string `input.csv`, not a file. The remote form is for
+data too large to commit; the digest is verified after download and a mismatch fails the test. Keep
+local files small.
 
 ### Evaluation modes
 
@@ -347,12 +349,14 @@ evaluation:
 
 ### The result contract
 
-An executor, human or agent, reads `protocol.md` and `inputs`, performs the protocol in any language,
-and writes `result.yaml` into a result directory of its choosing. It does not read
-`expected_outputs` first.
+An executor, human or agent, is given `protocol.md`, `inputs`, and the **result shape**: the
+keys, nesting, and file slots of `expected_outputs` with every value withheld, the evaluation mode,
+and in `diagnostic` mode the outcome labels. `scripts/check_test_result.py --shape <test directory>`
+prints it. The executor performs the protocol in any language and writes `result.yaml` into a result
+directory of its choosing. It does not read `expected_outputs` itself.
 
-*   In `exact` mode, `result.yaml` has one key per key of `expected_outputs`. A file-valued key names
-    a file in the result directory.
+*   In `exact` mode, `result.yaml` has one key per key of `expected_outputs`. A file slot is filled
+    with `{path: <file in the result directory>}`.
 *   In `diagnostic` mode, `result.yaml` has `outcome`, one of the accepted outcomes, and
     `observation`, one sentence saying what was found. If that outcome carries `expected_outputs`,
     their keys follow.
