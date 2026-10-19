@@ -356,7 +356,9 @@ evaluation:
 
 ### The result contract
 
-An executor, human or agent, is given `protocol.md`, `inputs`, and the **result shape**: the
+An executor, human or agent, is given `inputs`, the **result shape**, and, unless the run is
+deliberately unguided (`invocation.kind: unguided` in the run record), `protocol.md`. The result
+shape is the
 keys and nesting of `expected_outputs` with every value withheld, each file slot with its format
 and, for a table, its header row in order, the evaluation mode, and in `diagnostic` mode the
 outcome labels with the keys each one expects present or absent.

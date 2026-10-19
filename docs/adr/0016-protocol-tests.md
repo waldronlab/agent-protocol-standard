@@ -49,8 +49,10 @@ file slots are filled with `{path: ...}` in the same directory. In diagnostic mo
 Without this contract there is nothing machine-checkable, and the agent's own report of success
 would be the only evidence.
 
-The executor is given `protocol.md`, `inputs`, and the result shape: the keys, nesting, file slots,
-mode, and outcome labels of the test with every expected value withheld, printed by the checker.
+The executor is given `inputs` and the result shape: the keys, nesting, file slots, mode, and
+outcome labels of the test with every expected value withheld, printed by the checker. It is also
+given `protocol.md`, except in a run that is deliberately unguided, which the run record marks as
+such so that the baseline condition in #5 is expressible.
 It does not read `expected_outputs` itself. Without the shape a correct execution could fail on
 a key name; with the values it would not be a test.
 
