@@ -62,8 +62,10 @@ say something different, so a run is not a review and nothing is added to the pr
 completes.
 
 The checker writes a run record, `run.yaml`, naming the protocol and version, each test with its
-result, the executing agent and model, the date, and the checker version. The format is in
-`PROTOCOL_STANDARD.md` because the checker produces it. Where run records are kept is deferred to
+result, the executing agent, harness and model, the prompt that started the run and how the
+protocol reached the agent, the timestamps, and the checker version. The prompt and invocation are
+there because the benchmarking study in #5 varies exactly those, and nothing else in the record
+tells two such runs apart. The format is in `PROTOCOL_STANDARD.md` because the checker produces it. Where run records are kept is deferred to
 #44: while runs are few, the person attaches the record to the pull request or issue they are
 working on, and a collection is defined when the benchmarking study in #5 produces volume.
 

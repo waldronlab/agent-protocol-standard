@@ -401,8 +401,14 @@ started: 2026-10-18T14:02:11Z   # UTC timestamps, from the executor
 finished: 2026-10-18T14:09:40Z
 executor:
   agent: claude-code            # the agent or person that performed the protocol
+  harness: Claude Code 2.1.0    # the agent software and version, distinct from the model
   model: claude-fable-5-1       # omitted for a human executor
   language: R                   # what the execution was written in, if known
+  invocation:                   # how the protocol reached the agent
+    kind: skill                 # skill | in-context | unguided
+    skill: test-protocol 0.1.0  # name and version, for kind: skill
+  prompt: |                     # verbatim text that started the run
+    Run the tests for independent-filtering-variance.
 checker: check_test_result.py 0.1.0
 tests:
   - name: variance_rows
@@ -415,7 +421,12 @@ tests:
 The executor writes `executor.yaml` into the result directory before invoking the checker,
 containing the `executor` block and the `started` and `finished` timestamps; the checker copies
 them into the record and fills the rest from the test directory and its own version. A missing
-`executor.yaml` is an error, not a guess. Additional keys, at the top level of `executor.yaml` or
+`executor.yaml` is an error, not a guess. Within `executor`, `agent` is required; `harness`,
+`model`, `language`, `invocation`, and `prompt` are optional, since a human executor has no prompt
+and a prompt may hold paths or data its author does not want shared. An agent running a skill
+fills all of them. `invocation.kind` distinguishes a run through a skill, a run with the protocol
+text supplied in context, and a run given no protocol at all; two runs that differ only there are
+different experiments. Additional keys, at the top level of `executor.yaml` or
 under `executor`, are permitted and preserved, so a study that records cost, token counts,
 attempts, or an experimental condition adds them without a schema change. `run_record` is
 incremented when a defined key changes meaning.
