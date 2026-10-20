@@ -74,6 +74,9 @@ def test_diagnostic_requires_evidence_and_no_top_level_expectations():
     with pytest.raises(ValidationError, match="unique"):
         ProtocolTest(**{**base, "evaluation": {"mode": "diagnostic", "accepted_outcomes": [
             {"outcome": "r", "expected_absent": ["n"]}, {"outcome": "r", "expected_absent": ["m"]}]}})
+    with pytest.raises(ValidationError, match="both expects and forbids"):
+        ProtocolTest(**{**base, "evaluation": {"mode": "diagnostic", "accepted_outcomes": [
+            {"outcome": "r", "expected_outputs": {"n": 1}, "expected_absent": ["n"]}]}})
 
 
 def test_negative_or_non_finite_tolerance_rejected():

@@ -325,6 +325,11 @@ class AcceptedOutcome(BaseModel):
             for k in self.expected_absent:
                 if k in RESERVED_RESULT_KEYS:
                     raise ValueError(f"outcome '{self.outcome}' expected_absent may not name the reserved key '{k}'")
+            overlap = sorted(set(self.expected_absent) & set(self.expected_outputs or {}))
+            if overlap:
+                raise ValueError(
+                    f"outcome '{self.outcome}' both expects and forbids {overlap}; no result could satisfy it"
+                )
         return self
 
 
