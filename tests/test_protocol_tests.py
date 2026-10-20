@@ -439,6 +439,76 @@ def test_shape_downloads_and_verifies_remote_inputs(repo, tmp_path, capsys, monk
     assert checker.main(["--shape", str(repo / "protocols/example-protocol/tests"), str(tmp_path / "r2"), "--test", "basic"]) == 2
 
 
+def test_mixed_int_float_precision(tmp_path):
+    cv = lambda e, a, tol=0: checker.compare_value(e, a, tol, "k", tmp_path, tmp_path, tmp_path)  # noqa: E731
+    assert cv(9007199254740993, 9007199254740992.0)
+    assert cv(9007199254740993, 9007199254740993) == []
+
+
+def test_unterminated_quote_is_malformed(tmp_path):
+    exp, act = tmp_path / "exp.csv", tmp_path / "act.csv"
+    exp.write_text("id,x\n001,3\n")
+    act.write_text('id,x\n001,"3')
+    assert "malformed" in checker.compare_table(exp, act, 0, "t")[0]
+
+
+def test_symlinks_in_source_and_results_are_refused(repo, tmp_path, capsys):
+    tests = repo / "protocols/example-protocol/tests"
+    real = tmp_path / "elsewhere"
+    shutil.copytree(tests / "basic", real)
+    (tests / "linked").symlink_to(real)
+    assert checker.main(["--shape", str(tests), str(tmp_path / "r1")]) == 2
+    (tests / "linked").unlink()
+    results = tmp_path / "results"
+    shape(repo, results, capsys)
+    old = tmp_path / "old-run"
+    passing_results(old)
+    passing_results(results)
+    shutil.rmtree(results / "basic")
+    (results / "basic").symlink_to(old / "basic")
+    executor(results)
+    assert checker.main(["--test", "basic", str(tests), str(results)]) == 1
+    assert "symlink" in capsys.readouterr().out
+
+
+def test_contract_errors_exit_2(repo, tmp_path, capsys):
+    tests = repo / "protocols/example-protocol/tests"
+    results = tmp_path / "results"
+    shape(repo, results, capsys)
+    (results / "source.yaml").write_text("- not a mapping\n")
+    passing_results(results)
+    executor(results)
+    assert checker.main([str(tests), str(results)]) == 2
+    (repo / "protocols/example-protocol/protocol.md").write_text("---\nname: [unclosed\n---\n")
+    assert checker.main(["--shape", str(tests), str(tmp_path / "r2")]) == 2
+
+
+def test_remote_input_path_is_absolute_for_relative_results_dir(repo, tmp_path, capsys, monkeypatch):
+    import hashlib
+    data = b"feature,s1\nA,1\n"
+    test_yaml = repo / "protocols/example-protocol/tests/basic/test.yaml"
+    t = yaml.safe_load(test_yaml.read_text())
+    t["inputs"]["data"] = {"url": "https://example.org/input.csv", "sha256": hashlib.sha256(data).hexdigest()}
+    test_yaml.write_text(yaml.safe_dump(t))
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return data
+
+    monkeypatch.setattr(checker.urllib.request, "urlopen", lambda url: Resp())
+    monkeypatch.chdir(tmp_path)
+    rc = checker.main(["--shape", str(repo / "protocols/example-protocol/tests"), "rel-results", "--test", "basic"])
+    assert rc == 0
+    out = yaml.safe_load(capsys.readouterr().out)
+    assert Path(out["tests"][0]["inputs"]["data"]["path"]).is_absolute()
+
+
 def test_compare_value_scalars(tmp_path):
     cv = lambda e, a, tol=0: checker.compare_value(e, a, tol, "k", tmp_path, tmp_path, tmp_path)  # noqa: E731
     assert cv(1, 1.0) == []

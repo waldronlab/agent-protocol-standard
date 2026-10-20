@@ -82,7 +82,10 @@ def load_frontmatter(protocol_dir: Path) -> dict:
     protocol_md = protocol_dir / "protocol.md"
     if not protocol_md.is_file():
         raise ContractError(f"no protocol.md beside {protocol_dir / 'tests'}")
-    fm = extract_frontmatter(str(protocol_md))
+    try:
+        fm = extract_frontmatter(str(protocol_md))
+    except Exception as e:
+        raise ContractError(f"{protocol_md}: {e}")
     if not isinstance(fm, dict):
         raise ContractError(f"{protocol_md} has no parseable frontmatter")
     return fm
@@ -98,7 +101,14 @@ def compute_digest(protocol_dir: Path) -> str:
     files = [protocol_dir / "protocol.md"]
     tests_dir = protocol_dir / "tests"
     if tests_dir.is_dir():
-        files += [p for p in tests_dir.rglob("*") if p.is_file()]
+        for p in tests_dir.rglob("*"):
+            if p.is_symlink():
+                # A symlink would let the content change without the digest noticing.
+                raise ContractError(f"{p} is a symlink; the protocol directory and tests/ may not contain symlinks")
+            if p.is_file():
+                files.append(p)
+    if files[0].is_symlink():
+        raise ContractError(f"{files[0]} is a symlink; the protocol directory and tests/ may not contain symlinks")
     for p in sorted(files, key=lambda p: p.relative_to(protocol_dir).as_posix()):
         h.update(p.relative_to(protocol_dir).as_posix().encode("utf-8"))
         h.update(b"\0")
@@ -183,7 +193,8 @@ def shape_inputs(inputs: dict, test_dir: Path, results_dir: Path) -> dict:
         if is_file_mapping(v) and "url" in v:
             ref = FileRef(**v)
             local = resolve_expected_file(test_dir, results_dir, ref)
-            out[k] = {"path": str(local), "url": ref.url, "sha256": ref.sha256}
+            # Absolute, because the executor resolves input paths against the test directory.
+            out[k] = {"path": str(local.resolve()), "url": ref.url, "sha256": ref.sha256}
         else:
             out[k] = v
     return out
@@ -261,7 +272,7 @@ def read_csv(path: Path):
     """Header and rows of a CSV table. Raises TableError when it is not a table."""
     try:
         with path.open(newline="", encoding="utf-8") as f:
-            rows = list(csv.reader(f))
+            rows = list(csv.reader(f, strict=True))  # strict: an unterminated quote is an error
     except (OSError, UnicodeDecodeError, csv.Error) as e:
         raise TableError(f"{path}: {e}")
     if not rows:
@@ -382,7 +393,9 @@ def compare_value(expected, actual, tol: float, where: str, test_dir: Path, resu
     if _is_number(expected):
         if not _is_number(actual):
             return [f"{where}: {actual!r}, expected the number {expected!r}"]
-        if not (abs(actual - expected) <= tol):  # NaN fails: comparisons with NaN are false
+        # Decimals from the written representation, so an int and a float that differ beyond
+        # float precision do not round to equality, and NaN never matches.
+        if not _within(Decimal(repr(actual)), Decimal(repr(expected)), Decimal(repr(tol))):
             return [f"{where}: {actual!r}, expected {expected!r} within {tol}"]
         return []
     return [f"{where}: unsupported expected value {expected!r}"]
@@ -542,7 +555,9 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
     source_path = results_dir / SOURCE_FILE
     if not source_path.is_file():
         raise ContractError(f"{source_path} is missing; run --shape before executing")
-    source = yaml.safe_load(source_path.read_text(encoding="utf-8")) or {}
+    source = yaml.safe_load(source_path.read_text(encoding="utf-8"))
+    if not isinstance(source, dict):
+        raise ContractError(f"{source_path} is not a mapping; re-run from --shape")
     current = compute_digest(protocol_dir)
     if source.get("source_digest") != current:
         raise ContractError(
@@ -556,6 +571,15 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
         result_dir = results_dir / case.name
         if not result_dir.is_dir():
             entries.append({"name": case.name, "result": "not_run"})
+            continue
+        try:
+            result_dir.resolve().relative_to(results_dir.resolve())
+            if result_dir.is_symlink():
+                raise ValueError
+        except ValueError:
+            # A symlink to another run's directory would let stale outputs pass.
+            entries.append({"name": case.name, "result": "fail",
+                            "failures": [f"{result_dir} is a symlink or resolves outside the results directory"]})
             continue
         entries.append(check_one(case, test_dir, result_dir, results_dir))
 
