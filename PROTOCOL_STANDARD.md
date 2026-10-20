@@ -277,6 +277,216 @@ A brand-new protocol, or a release nobody has reviewed yet, still carries the se
 
 These rules are enforced by `scripts/validate_protocol.py`, which runs on every pull request.
 
+## Tests
+
+*Proposed in ADR 0016. The validator, the checker, and the `test-protocol` skill described here
+are not yet implemented; until they are, CI does not check `tests/` and the commands below do not
+exist. This notice is removed when they do.*
+
+A protocol may carry tests: known inputs with the outputs a correct execution produces. Tests are
+optional. When present they live beside the protocol, one directory per test:
+
+```text
+protocols/<name>/
+├── protocol.md
+└── tests/
+    └── <test-name>/
+        ├── test.yaml
+        ├── input.csv        # local data referenced from test.yaml
+        └── retained.csv     # an expected output file
+```
+
+### `test.yaml`
+
+```yaml
+name: variance_rows                 # must match the directory name
+description: Unbiased variance filtering with features in rows.
+inputs:                             # everything the executor is given
+  data: {path: input.csv}           # a file: path, or url + sha256 (below)
+  filter: variance
+  theta: 0.4
+  tie_breaker: feature_id_ascending
+expected_outputs:                   # what a correct execution produces
+  summary:
+    A: 0
+    B: 1.3333333333333333
+    C: 1.3333333333333333
+    D: 33.333333333333336
+    E: 48
+  removed_features: [A, B]
+  retained_matrix: {path: retained.csv}   # a file, compared as a table
+evaluation:
+  mode: exact                       # exact | diagnostic
+  numeric_tolerance: 1.0e-12        # optional, default 0
+```
+
+*   `name`: (String) Kebab or snake case; must equal the directory name.
+*   `description`: (String) One sentence.
+*   `inputs`: (Mapping) Parameter values and data files. Keys are the protocol's own parameter
+    names where it has them.
+*   `expected_outputs`: (Mapping) Values and files a correct execution produces. Keys are the
+    quantities the protocol says to record.
+*   `evaluation`: (Mapping) `mode` is required. `numeric_tolerance` is an absolute tolerance applied
+    to every numeric comparison, default `0`.
+
+A **file** is a mapping with exactly one of two shapes: `{path: <relative path>}`, inside the test
+directory with no `..`, or `{url: <https URL>, sha256: <hex digest>}`. Any other string is a
+literal value, so `data: input.csv` is the string `input.csv`, not a file. The remote form is for
+data too large to commit; the digest is verified after download and a mismatch fails the test. Keep
+local files small. A table slot in `expected_outputs` may add `header: withheld` when the column
+set is itself part of the answer, as in a test that selects columns; the executor then names the
+columns as the protocol directs and the checker compares the header as it compares everything
+else. The default is to show the header in the result shape.
+
+### Evaluation modes
+
+**`exact`**: every entry in `expected_outputs` must be present in the result and match.
+`expected_outputs` must have at least one entry; a test that checks nothing is invalid.
+
+**`diagnostic`**: the input violates a requirement the protocol states, and the test checks what the
+executor does about it. `evaluation.accepted_outcomes` lists the outcomes that count as correct.
+The top-level `expected_outputs` is omitted; each outcome carries its own evidence instead, at
+least one of:
+
+*   `expected_outputs`, compared as in `exact` mode when the executor reports that outcome;
+*   `expected_absent`, keys that must not appear in the result. This is how a refusal is checked:
+    an executor that refused did not produce the protocol's outputs.
+
+An outcome with neither, or with both empty, is invalid, because a label alone is the executor's
+word. The keys
+`outcome` and `observation` are reserved for the executor's report and may appear in neither
+`expected_outputs` nor `expected_absent`; the validator rejects a test that uses them.
+
+```yaml
+evaluation:
+  mode: diagnostic
+  accepted_outcomes:
+    - outcome: orientation_corrected
+      expected_outputs:
+        removed_features: [A, B]
+        retained_features: [C, D, E]
+    - outcome: refused_for_orientation
+      expected_absent: [removed_features, retained_features, retained_matrix]
+```
+
+### The result contract
+
+An executor, human or agent, is given `inputs`, the **result shape**, and, unless the run is
+deliberately unguided (`invocation.kind: unguided` in the run record), `protocol.md`. The result
+shape is the top-level keys of `expected_outputs` with every value withheld, each file slot with
+its format and, for a table, its header row in order unless the slot says `header: withheld`, the
+evaluation mode, and in `diagnostic`
+mode the outcome labels with the keys each one expects present or absent. Top-level keys are the
+quantities the protocol says to record and are fixed by it. The keys of any nested mapping are
+data, such as feature identifiers, and are withheld: the shape shows a nested mapping as
+`{<key>: <type>}`, because its membership can itself be the answer. Data rows and scalar values
+are never included. `scripts/check_test_result.py --shape <tests directory> <results directory>`
+prints the shape of every test, or of one with `--test <name>`, and writes `source.yaml` into the
+results directory: the commit the checkout is at, whether the protocol directory has uncommitted
+changes, and a digest of `protocol.md` and the tests directory. That is the snapshot the run is
+attributed to. It is taken before execution because the checkout can move afterwards.
+
+The executor performs the protocol in any language and writes its results into a **results
+directory** of its choosing, one subdirectory per test named after the test, each holding
+`result.yaml` and any output files. The results directory must be empty when `--shape` writes
+`source.yaml` into it, so a run can never be checked against a previous run's files, and it must
+lie outside the protocol directory, whose digest it would otherwise change. The checker refuses
+both. The executor does not read `expected_outputs` itself.
+
+*   In `exact` mode, `result.yaml` has one key per key of `expected_outputs`. A file slot is filled
+    with `{path: <file in that test's result subdirectory>}`.
+*   In `diagnostic` mode, `result.yaml` has `outcome`, one of the accepted outcomes, and
+    `observation`, one sentence saying what was found. If that outcome carries `expected_outputs`,
+    their keys follow.
+
+`scripts/check_test_result.py <tests directory> <results directory>` compares every test that has a
+result subdirectory, or one with `--test <name>`, and is the only thing that decides pass or fail. A
+test with no result subdirectory is reported as not run, which is neither pass nor fail. Its
+comparison rules:
+
+*   Numbers match within `numeric_tolerance`. Strings, booleans and nulls match exactly. Lists match
+    element by element, in order. At the top level of `result.yaml`, a key missing from the result
+    fails and a key present only in the result is ignored, so an executor may record more than the
+    test asks. A nested mapping must have exactly the expected key set, because its membership is
+    data and an extra feature is a wrong answer.
+*   Files are compared as tables. The only table format is CSV: UTF-8, comma delimited, double-quote
+    quoting as in RFC 4180, with a header row. A file slot compared as a table must have a name
+    ending in `.csv`, in `path` or in the URL; the validator rejects anything else, and no other
+    file format is defined yet.
+*   Two tables match when the header rows are identical as strings, the rows are in the same order,
+    and every cell matches. The first column is the row identifier and is compared as a string, as
+    is the header, so `001` and `1` differ. In every other column a cell is numeric, within
+    tolerance, when the expected cell parses as a number, and a string otherwise. An empty cell is a
+    missing value and matches only an empty cell.
+
+### The run record
+
+A run is not a review and adds nothing to the protocol. The checker writes `run.yaml` at the top of
+the results directory, one record covering every test it compared, overwriting any earlier record
+there:
+
+```yaml
+run_record: 1                   # schema version of this record
+protocol: independent-filtering-variance
+version: 1.2.1
+repository: waldronlab/agent-protocols
+protocol_commit: 844ce92        # commit the protocol and tests were read at, from source.yaml
+uncommitted: false              # true, with no commit, if the checkout was dirty
+source_digest: sha256:9f2c...   # digest of protocol.md and tests/, from source.yaml
+started: 2026-10-18T14:02:11Z   # UTC timestamps, from the executor
+finished: 2026-10-18T14:09:40Z
+executor:
+  agent: claude-code            # the agent or person that performed the protocol
+  harness: Claude Code 2.1.0    # the agent software and version, distinct from the model
+  model: claude-fable-5-1       # omitted for a human executor
+  language: R                   # what the execution was written in, if known
+  invocation:                   # how the protocol reached the agent
+    kind: skill                 # skill | in-context | unguided
+    skill: test-protocol 0.1.0  # name and version, for kind: skill
+  prompt: |                     # verbatim text that started the run
+    Run the tests for independent-filtering-variance.
+checker: check_test_result.py 0.1.0
+tests:
+  - name: variance_rows
+    result: pass                # pass | fail
+  - name: mean_columns
+    result: pass
+    outcome: orientation_corrected   # diagnostic mode only
+```
+
+The executor writes `executor.yaml` at the top of the results directory before invoking the checker,
+containing the `executor` block and the `started` and `finished` timestamps; the checker copies
+them into the record and fills the rest from the test directory and its own version. A missing
+`executor.yaml` is an error, not a guess. `protocol_commit` and `uncommitted` come from
+`source.yaml`, written by `--shape` before execution. The checker recomputes the digest from the
+current checkout and refuses to write a record if it differs, so a record never names a commit
+that does not contain what was executed. A run from a dirty checkout records `uncommitted: true`
+and no commit. Within `executor`, `agent` is required; `harness`,
+`model`, `language`, `invocation`, and `prompt` are optional, since a human executor has no prompt
+and a prompt may hold paths or data its author does not want shared. An agent running a skill
+fills all of them. `invocation.kind` distinguishes a run through a skill, a run with the protocol
+text supplied in context, and a run given no protocol at all; two runs that differ only there are
+different experiments. Additional keys, at the top level of `executor.yaml` or
+under `executor`, are permitted and preserved, so a study that records cost, token counts,
+attempts, or an experimental condition adds them without a schema change. The keys the checker
+writes itself, `run_record`, `protocol`, `version`, `repository`, `protocol_commit`,
+`uncommitted`, `source_digest`, `checker`, and `tests`, are reserved: an `executor.yaml` that supplies any of them is rejected rather than
+silently overridden. `run_record` is incremented when a defined key changes meaning.
+
+Where run records are kept is not yet defined (issue #44). Attach the record to the pull request or
+issue it is relevant to.
+
+A reviewer who has run the tests may record a `verified-with-benchmark` review (see Review Statuses
+above), citing the run record in Notes. That is a judgement by a named person, made once; it is not
+made automatically and not made per run. A run with failures is reported where the record is
+attached, with the failing comparisons. Which of the executor, its environment, the protocol, or
+the test is at fault is found out, not assumed: an agent can execute a correct protocol wrongly,
+and measuring how often is what the tests are for.
+
+CI validates each `test.yaml` against this schema and checks that local files exist. It does not
+fetch remote files or execute tests. The `test-protocol` skill in this repository implements the
+result contract for an agent.
+
 ## Example Protocol
 
 ```yaml
