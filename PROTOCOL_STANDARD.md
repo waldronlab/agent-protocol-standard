@@ -279,6 +279,10 @@ These rules are enforced by `scripts/validate_protocol.py`, which runs on every 
 
 ## Tests
 
+*Proposed in ADR 0016. The validator, the checker, and the `test-protocol` skill described here
+are not yet implemented; until they are, CI does not check `tests/` and the commands below do not
+exist. This notice is removed when they do.*
+
 A protocol may carry tests: known inputs with the outputs a correct execution produces. Tests are
 optional. When present they live beside the protocol, one directory per test:
 
@@ -358,22 +362,29 @@ evaluation:
 
 An executor, human or agent, is given `inputs`, the **result shape**, and, unless the run is
 deliberately unguided (`invocation.kind: unguided` in the run record), `protocol.md`. The result
-shape is the
-keys and nesting of `expected_outputs` with every value withheld, each file slot with its format
-and, for a table, its header row in order, the evaluation mode, and in `diagnostic` mode the
-outcome labels with the keys each one expects present or absent.
-`scripts/check_test_result.py --shape <test directory>` prints it. Data rows and scalar values are
-never included. The executor performs the protocol in any language and writes `result.yaml` into a result
-directory of its choosing. It does not read `expected_outputs` itself.
+shape is the top-level keys of `expected_outputs` with every value withheld, each file slot with
+its format and, for a table, its header row in order, the evaluation mode, and in `diagnostic`
+mode the outcome labels with the keys each one expects present or absent. Top-level keys are the
+quantities the protocol says to record and are fixed by it. The keys of any nested mapping are
+data, such as feature identifiers, and are withheld: the shape shows a nested mapping as
+`{<key>: <type>}`, because its membership can itself be the answer. Data rows and scalar values
+are never included. `scripts/check_test_result.py --shape <tests directory>` prints the shape of
+every test, or of one with `--test <name>`.
+
+The executor performs the protocol in any language and writes its results into a **results
+directory** of its choosing, one subdirectory per test named after the test, each holding
+`result.yaml` and any output files. It does not read `expected_outputs` itself.
 
 *   In `exact` mode, `result.yaml` has one key per key of `expected_outputs`. A file slot is filled
-    with `{path: <file in the result directory>}`.
+    with `{path: <file in that test's result subdirectory>}`.
 *   In `diagnostic` mode, `result.yaml` has `outcome`, one of the accepted outcomes, and
     `observation`, one sentence saying what was found. If that outcome carries `expected_outputs`,
     their keys follow.
 
-`scripts/check_test_result.py <test directory> <result directory>` compares the two and is the only
-thing that decides pass or fail. Its rules:
+`scripts/check_test_result.py <tests directory> <results directory>` compares every test that has a
+result subdirectory, or one with `--test <name>`, and is the only thing that decides pass or fail. A
+test with no result subdirectory is reported as not run, which is neither pass nor fail. Its
+comparison rules:
 
 *   Numbers match within `numeric_tolerance`. Strings, booleans and nulls match exactly. Lists match
     element by element, in order. Mappings match key by key; a key missing from the result fails,
@@ -390,8 +401,9 @@ thing that decides pass or fail. Its rules:
 
 ### The run record
 
-A run is not a review and adds nothing to the protocol. The checker writes `run.yaml` into the
-result directory:
+A run is not a review and adds nothing to the protocol. The checker writes `run.yaml` at the top of
+the results directory, one record covering every test it compared, overwriting any earlier record
+there:
 
 ```yaml
 run_record: 1                   # schema version of this record
@@ -420,7 +432,7 @@ tests:
     outcome: orientation_corrected   # diagnostic mode only
 ```
 
-The executor writes `executor.yaml` into the result directory before invoking the checker,
+The executor writes `executor.yaml` at the top of the results directory before invoking the checker,
 containing the `executor` block and the `started` and `finished` timestamps; the checker copies
 them into the record and fills the rest from the test directory and its own version. A missing
 `executor.yaml` is an error, not a guess. Within `executor`, `agent` is required; `harness`,
@@ -438,8 +450,10 @@ issue it is relevant to.
 
 A reviewer who has run the tests may record a `verified-with-benchmark` review (see Review Statuses
 above), citing the run record in Notes. That is a judgement by a named person, made once; it is not
-made automatically and not made per run. A run with failures is a bug report against the protocol
-or the test.
+made automatically and not made per run. A run with failures is reported where the record is
+attached, with the failing comparisons. Which of the executor, its environment, the protocol, or
+the test is at fault is found out, not assumed: an agent can execute a correct protocol wrongly,
+and measuring how often is what the tests are for.
 
 CI validates each `test.yaml` against this schema and checks that local files exist. It does not
 fetch remote files or execute tests. The `test-protocol` skill in this repository implements the
