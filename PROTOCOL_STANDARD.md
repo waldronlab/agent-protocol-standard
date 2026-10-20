@@ -341,6 +341,7 @@ else. The default is to show the header in the result shape.
 ### Evaluation modes
 
 **`exact`**: every entry in `expected_outputs` must be present in the result and match.
+`expected_outputs` must have at least one entry; a test that checks nothing is invalid.
 
 **`diagnostic`**: the input violates a requirement the protocol states, and the test checks what the
 executor does about it. `evaluation.accepted_outcomes` lists the outcomes that count as correct.
@@ -379,8 +380,11 @@ mode the outcome labels with the keys each one expects present or absent. Top-le
 quantities the protocol says to record and are fixed by it. The keys of any nested mapping are
 data, such as feature identifiers, and are withheld: the shape shows a nested mapping as
 `{<key>: <type>}`, because its membership can itself be the answer. Data rows and scalar values
-are never included. `scripts/check_test_result.py --shape <tests directory>` prints the shape of
-every test, or of one with `--test <name>`.
+are never included. `scripts/check_test_result.py --shape <tests directory> <results directory>`
+prints the shape of every test, or of one with `--test <name>`, and writes `source.yaml` into the
+results directory: the commit the checkout is at, whether the protocol directory has uncommitted
+changes, and a digest of `protocol.md` and the tests directory. That is the snapshot the run is
+attributed to. It is taken before execution because the checkout can move afterwards.
 
 The executor performs the protocol in any language and writes its results into a **results
 directory** of its choosing, one subdirectory per test named after the test, each holding
@@ -423,7 +427,8 @@ run_record: 1                   # schema version of this record
 protocol: independent-filtering-variance
 version: 1.2.1
 repository: waldronlab/agent-protocols
-protocol_commit: 844ce92        # commit the protocol and tests were read at
+protocol_commit: 844ce92        # commit the protocol and tests were read at, from source.yaml
+uncommitted: false              # true, with no commit, if the checkout was dirty
 started: 2026-10-18T14:02:11Z   # UTC timestamps, from the executor
 finished: 2026-10-18T14:09:40Z
 executor:
@@ -448,10 +453,11 @@ tests:
 The executor writes `executor.yaml` at the top of the results directory before invoking the checker,
 containing the `executor` block and the `started` and `finished` timestamps; the checker copies
 them into the record and fills the rest from the test directory and its own version. A missing
-`executor.yaml` is an error, not a guess. `protocol_commit` is the commit of the checkout the
-tests directory sits in; if the protocol directory has uncommitted changes, the checker records
-no commit and marks the run `uncommitted: true`, so a record never names a commit that does not
-contain what was executed. Within `executor`, `agent` is required; `harness`,
+`executor.yaml` is an error, not a guess. `protocol_commit` and `uncommitted` come from
+`source.yaml`, written by `--shape` before execution. The checker recomputes the digest from the
+current checkout and refuses to write a record if it differs, so a record never names a commit
+that does not contain what was executed. A run from a dirty checkout records `uncommitted: true`
+and no commit. Within `executor`, `agent` is required; `harness`,
 `model`, `language`, `invocation`, and `prompt` are optional, since a human executor has no prompt
 and a prompt may hold paths or data its author does not want shared. An agent running a skill
 fills all of them. `invocation.kind` distinguishes a run through a skill, a run with the protocol
@@ -459,8 +465,8 @@ text supplied in context, and a run given no protocol at all; two runs that diff
 different experiments. Additional keys, at the top level of `executor.yaml` or
 under `executor`, are permitted and preserved, so a study that records cost, token counts,
 attempts, or an experimental condition adds them without a schema change. The keys the checker
-writes itself, `run_record`, `protocol`, `version`, `repository`, `protocol_commit`, `checker`, and
-`tests`, are reserved: an `executor.yaml` that supplies any of them is rejected rather than
+writes itself, `run_record`, `protocol`, `version`, `repository`, `protocol_commit`,
+`uncommitted`, `checker`, and `tests`, are reserved: an `executor.yaml` that supplies any of them is rejected rather than
 silently overridden. `run_record` is incremented when a defined key changes meaning.
 
 Where run records are kept is not yet defined (issue #44). Attach the record to the pull request or
