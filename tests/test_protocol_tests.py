@@ -563,6 +563,30 @@ def test_symlinked_result_yaml_fails(repo, tmp_path, capsys):
     assert "symlink" in capsys.readouterr().out
 
 
+def test_parameter_named_path_does_not_shield_siblings():
+    import datetime
+    with pytest.raises(ValidationError, match="unsupported value of type date"):
+        ProtocolTest(**exact_case(expected_outputs={"path": "literal", "day": datetime.date(2026, 10, 18)}))
+
+
+def test_checker_rejects_stray_files_and_symlinked_tests_root(repo, tmp_path, capsys):
+    tests = repo / "protocols/example-protocol/tests"
+    (tests / "README.md").write_text("notes\n")
+    assert checker.main(["--shape", str(tests), str(tmp_path / "r1")]) == 2
+    (tests / "README.md").unlink()
+    real = tmp_path / "real-tests"
+    shutil.move(str(tests), str(real))
+    tests.symlink_to(real)
+    assert checker.main(["--shape", str(tests), str(tmp_path / "r2")]) == 2
+
+
+def test_undownloadable_url_is_a_contract_error(tmp_path):
+    from scripts.models import FileRef
+    ref = FileRef(url="https://example.org/my input.csv", sha256="a" * 64)
+    with pytest.raises(checker.ContractError, match="could not download"):
+        checker.resolve_expected_file(tmp_path, tmp_path / "results", ref)
+
+
 def test_compare_value_scalars(tmp_path):
     cv = lambda e, a, tol=0: checker.compare_value(e, a, tol, "k", tmp_path, tmp_path, tmp_path)  # noqa: E731
     assert cv(1, 1.0) == []

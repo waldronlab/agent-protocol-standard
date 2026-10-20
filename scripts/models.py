@@ -276,10 +276,11 @@ def _first_error(exc: Exception) -> str:
 _SUPPORTED_SCALARS = (str, int, float, bool, type(None))
 
 
-def _check_supported_values(obj: Any, where: str):
+def _check_supported_values(obj: Any, where: str, section: bool = False):
     """Expectations are strings, numbers, booleans, nulls, lists, mappings, and file slots.
-    YAML also produces dates and timestamps, which the checker cannot compare; quote them."""
-    if is_file_mapping(obj):
+    YAML also produces dates and timestamps, which the checker cannot compare; quote them.
+    A section's own keys are names, so a key called `path` never makes the section a file."""
+    if not section and is_file_mapping(obj):
         return
     if isinstance(obj, dict):
         for k, v in obj.items():
@@ -319,7 +320,7 @@ class AcceptedOutcome(BaseModel):
         if has_outputs:
             _check_no_reserved(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs")
             _check_file_refs(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs", expected=True)
-            _check_supported_values(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs")
+            _check_supported_values(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs", section=True)
         if has_absent:
             for k in self.expected_absent:
                 if k in RESERVED_RESULT_KEYS:
@@ -372,7 +373,7 @@ class ProtocolTest(BaseModel):
                 raise ValueError("mode 'exact' does not use 'accepted_outcomes'")
             _check_no_reserved(self.expected_outputs, "expected_outputs")
             _check_file_refs(self.expected_outputs, "expected_outputs", expected=True)
-            _check_supported_values(self.expected_outputs, "expected_outputs")
+            _check_supported_values(self.expected_outputs, "expected_outputs", section=True)
         else:
             if self.expected_outputs is not None:
                 raise ValueError("mode 'diagnostic' puts expectations under each accepted outcome, not at the top level")

@@ -58,10 +58,16 @@ class TableError(Exception):
 def load_tests(tests_dir: Path, only: str = None):
     if not tests_dir.is_dir():
         raise ContractError(f"'{tests_dir}' is not a directory")
+    if tests_dir.is_symlink():
+        raise ContractError(f"{tests_dir} is a symlink; the protocol directory and tests/ may not contain symlinks")
     cases = []
     errors = []
     for entry in sorted(tests_dir.iterdir()):
-        if entry.name.startswith('.') or not entry.is_dir():
+        if entry.name.startswith('.'):
+            continue
+        if not entry.is_dir():
+            # The validator rejects these; the checker must not quietly run without them.
+            errors.append(f"tests/{entry.name}: only test directories belong directly under tests/")
             continue
         if only is not None and entry.name != only:
             continue
@@ -101,6 +107,8 @@ def compute_digest(protocol_dir: Path) -> str:
     h = hashlib.sha256()
     files = [protocol_dir / "protocol.md"]
     tests_dir = protocol_dir / "tests"
+    if tests_dir.is_symlink():
+        raise ContractError(f"{tests_dir} is a symlink; the protocol directory and tests/ may not contain symlinks")
     if tests_dir.is_dir():
         for p in tests_dir.rglob("*"):
             if p.is_symlink():
@@ -263,8 +271,12 @@ def resolve_expected_file(test_dir: Path, results_dir: Path, ref: FileRef) -> Pa
         if cached == ref.sha256:
             return target
         target.unlink()
-    with urllib.request.urlopen(ref.url) as resp:  # noqa: S310 - https enforced by the schema
-        data = resp.read()
+    try:
+        with urllib.request.urlopen(ref.url) as resp:  # noqa: S310 - https enforced by the schema
+            data = resp.read()
+    except (OSError, ValueError, UnicodeError) as e:
+        # URLError and HTTPError are OSErrors; http.client.InvalidURL is a ValueError.
+        raise ContractError(f"could not download {ref.url}: {e}")
     digest = hashlib.sha256(data).hexdigest()
     if digest != ref.sha256:
         raise ContractError(f"downloaded {ref.url} has sha256 {digest}, expected {ref.sha256}")
