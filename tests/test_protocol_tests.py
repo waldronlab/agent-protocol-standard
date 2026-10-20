@@ -351,6 +351,94 @@ def test_cached_remote_file_is_verified(tmp_path, monkeypatch):
     assert calls == [1]                                        # good cache reused
 
 
+def test_nested_file_slot_rejected():
+    with pytest.raises(ValidationError, match="direct value of inputs"):
+        ProtocolTest(**exact_case(inputs={"files": {"a": {"path": "input.csv"}}}))
+    with pytest.raises(ValidationError, match="direct value of expected_outputs"):
+        ProtocolTest(**exact_case(expected_outputs={"tables": [{"path": "out.csv"}]}))
+
+
+def test_shape_refusal_creates_nothing(repo, tmp_path, capsys):
+    inside = repo / "protocols/example-protocol/results"
+    assert checker.main(["--shape", str(repo / "protocols/example-protocol/tests"), str(inside)]) == 2
+    assert not inside.exists()
+
+
+def test_table_width_and_precision(tmp_path):
+    exp, act = tmp_path / "exp.csv", tmp_path / "act.csv"
+    exp.write_text("id,x\n001,9007199254740993\n")
+    act.write_text("id,x\n001,9007199254740992\n")           # adjacent integers beyond float precision
+    assert checker.compare_table(exp, act, 0, "t")
+    act.write_text("id,x\n001,9007199254740993\n")
+    assert checker.compare_table(exp, act, 0, "t") == []
+    act.write_text("id,x\n001\n")                           # ragged actual row is a failure
+    assert "malformed" in checker.compare_table(exp, act, 0, "t")[0]
+    act.write_text("")                                       # empty actual file is a failure
+    assert "malformed" in checker.compare_table(exp, act, 0, "t")[0]
+    exp.write_text("id,x\n001,1,2\n")                       # ragged expected row is a broken test
+    act.write_text("id,x\n001,1\n")
+    with pytest.raises(checker.ContractError):
+        checker.compare_table(exp, act, 0, "t")
+
+
+def test_result_symlink_outside_results_fails(repo, tmp_path, capsys):
+    results = tmp_path / "results"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys)
+    passing_results(results)
+    executor(results)
+    (results / "basic/retained.csv").unlink()
+    (results / "basic/retained.csv").symlink_to(tests / "basic/retained.csv")
+    assert checker.main(["--test", "basic", str(tests), str(results)]) == 1
+    assert "resolves outside" in capsys.readouterr().out
+
+
+def test_timestamps_must_carry_a_timezone(repo, tmp_path, capsys):
+    results = tmp_path / "results"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys)
+    passing_results(results)
+    executor(results, started="2026-10-20")
+    assert checker.main([str(tests), str(results)]) == 2
+    executor(results, started="2026-10-20T06:30:00+02:00")
+    assert checker.main([str(tests), str(results)]) == 0
+    record = yaml.safe_load((results / "run.yaml").read_text())
+    assert record["started"] == "2026-10-20T04:30:00Z"
+
+
+def test_shape_downloads_and_verifies_remote_inputs(repo, tmp_path, capsys, monkeypatch):
+    import hashlib
+    data = b"feature,s1\nA,1\n"
+    digest = hashlib.sha256(data).hexdigest()
+    test_yaml = repo / "protocols/example-protocol/tests/basic/test.yaml"
+    t = yaml.safe_load(test_yaml.read_text())
+    t["inputs"]["data"] = {"url": "https://example.org/input.csv", "sha256": digest}
+    test_yaml.write_text(yaml.safe_dump(t))
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return data
+
+    monkeypatch.setattr(checker.urllib.request, "urlopen", lambda url: Resp())
+    results = tmp_path / "results"
+    rc, out = shape(repo, results, capsys, "--test", "basic")
+    assert rc == 0
+    given = out["tests"][0]["inputs"]["data"]
+    assert given["url"] == "https://example.org/input.csv"
+    assert Path(given["path"]).read_bytes() == data
+    assert Path(given["path"]).resolve().is_relative_to(results.resolve())
+    # a digest mismatch refuses before anything is executed
+    t["inputs"]["data"]["sha256"] = "0" * 64
+    test_yaml.write_text(yaml.safe_dump(t))
+    assert checker.main(["--shape", str(repo / "protocols/example-protocol/tests"), str(tmp_path / "r2"), "--test", "basic"]) == 2
+
+
 def test_compare_value_scalars(tmp_path):
     cv = lambda e, a, tol=0: checker.compare_value(e, a, tol, "k", tmp_path, tmp_path, tmp_path)  # noqa: E731
     assert cv(1, 1.0) == []

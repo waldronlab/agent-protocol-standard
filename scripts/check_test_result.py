@@ -16,8 +16,8 @@ the only thing that decides pass or fail.
 import sys
 import os
 import csv
-import io
 import hashlib
+from decimal import Decimal, InvalidOperation
 import subprocess
 import urllib.request
 from pathlib import Path
@@ -44,6 +44,10 @@ CACHE_DIR = ".remote"
 
 class ContractError(Exception):
     """The inputs do not meet the contract; nothing was compared."""
+
+
+class TableError(Exception):
+    """A CSV file is not a well-formed table."""
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +175,20 @@ def shape_value(v, test_dir: Path, results_dir: Path, top: bool):
     return _type_name(v)
 
 
+def shape_inputs(inputs: dict, test_dir: Path, results_dir: Path) -> dict:
+    """Inputs as the executor receives them. A remote file is downloaded now, verified against
+    its digest, and handed over as a local path, so execution never runs on unverified bytes."""
+    out = {}
+    for k, v in inputs.items():
+        if is_file_mapping(v) and "url" in v:
+            ref = FileRef(**v)
+            local = resolve_expected_file(test_dir, results_dir, ref)
+            out[k] = {"path": str(local), "url": ref.url, "sha256": ref.sha256}
+        else:
+            out[k] = v
+    return out
+
+
 def shape_of(case: ProtocolTest, test_dir: Path, results_dir: Path) -> dict:
     shape = {
         "name": case.name,
@@ -178,7 +196,7 @@ def shape_of(case: ProtocolTest, test_dir: Path, results_dir: Path) -> dict:
         "test_directory": str(test_dir),
         "mode": case.evaluation.mode,
         "numeric_tolerance": case.evaluation.numeric_tolerance,
-        "inputs": case.inputs,
+        "inputs": shape_inputs(case.inputs, test_dir, results_dir),
     }
     if case.evaluation.mode == "exact":
         shape["result"] = shape_value(case.expected_outputs, test_dir, results_dir, True)
@@ -197,12 +215,15 @@ def shape_of(case: ProtocolTest, test_dir: Path, results_dir: Path) -> dict:
 
 
 def check_results_dir_for_shape(protocol_dir: Path, results_dir: Path):
-    results_dir.mkdir(parents=True, exist_ok=True)
+    inside = False
     try:
         results_dir.resolve().relative_to(protocol_dir.resolve())
-        raise ContractError(f"results directory {results_dir} lies inside the protocol directory; put it elsewhere")
+        inside = True
     except ValueError:
         pass
+    if inside:  # checked before anything is created, so a refusal leaves nothing behind
+        raise ContractError(f"results directory {results_dir} lies inside the protocol directory; put it elsewhere")
+    results_dir.mkdir(parents=True, exist_ok=True)
     if any(results_dir.iterdir()):
         raise ContractError(f"results directory {results_dir} is not empty; use a new directory for each run")
 
@@ -237,21 +258,39 @@ def resolve_expected_file(test_dir: Path, results_dir: Path, ref: FileRef) -> Pa
 
 
 def read_csv(path: Path):
-    with path.open(newline="", encoding="utf-8") as f:
-        rows = list(csv.reader(f))
+    """Header and rows of a CSV table. Raises TableError when it is not a table."""
+    try:
+        with path.open(newline="", encoding="utf-8") as f:
+            rows = list(csv.reader(f))
+    except (OSError, UnicodeDecodeError, csv.Error) as e:
+        raise TableError(f"{path}: {e}")
     if not rows:
-        raise ContractError(f"{path} is empty; a table needs a header row")
+        raise TableError(f"{path} is empty; a table needs a header row")
+    width = len(rows[0])
+    for i, r in enumerate(rows[1:], start=1):
+        if len(r) != width:
+            raise TableError(f"{path} row {i} has {len(r)} cells but the header has {width}")
     return rows[0], rows[1:]
 
 
 def _as_number(s: str):
+    """A CSV cell as a Decimal, exact to the digits written, or None if it is not a number.
+    NaN parses as a number so that it can fail the comparison rather than match as a string."""
     s = s.strip()
     if s == "":
         return None
     try:
-        return float(s)
-    except ValueError:
+        return Decimal(s)
+    except InvalidOperation:
         return None
+
+
+def _within(actual: Decimal, expected: Decimal, tol: Decimal) -> bool:
+    if actual.is_nan() or expected.is_nan():
+        return False
+    if actual.is_infinite() or expected.is_infinite():
+        return actual == expected
+    return abs(actual - expected) <= tol
 
 
 # ---------------------------------------------------------------------------
@@ -260,8 +299,15 @@ def _as_number(s: str):
 
 def compare_table(expected_path: Path, actual_path: Path, tol: float, where: str):
     failures = []
-    exp_header, exp_rows = read_csv(expected_path)
-    act_header, act_rows = read_csv(actual_path)
+    try:
+        exp_header, exp_rows = read_csv(expected_path)
+    except TableError as e:
+        raise ContractError(f"expected table is malformed: {e}")  # the test is broken, not the result
+    try:
+        act_header, act_rows = read_csv(actual_path)
+    except TableError as e:
+        return [f"{where}: result table is malformed: {e}"]
+    dtol = Decimal(repr(tol))
     if exp_header != act_header:
         failures.append(f"{where}: header is {act_header}, expected {exp_header}")
         return failures
@@ -279,8 +325,7 @@ def compare_table(expected_path: Path, actual_path: Path, tol: float, where: str
                     failures.append(f"{cell}: '{ac}', expected '{ec}'")
             else:
                 an = _as_number(ac)
-                # Written so that NaN fails: any comparison with NaN is false.
-                if an is None or not (abs(an - _as_number(ec)) <= tol):
+                if an is None or not _within(an, _as_number(ec), dtol):
                     failures.append(f"{cell}: '{ac}', expected {ec} within {tol}")
     return failures
 
@@ -297,8 +342,12 @@ def compare_value(expected, actual, tol: float, where: str, test_dir: Path, resu
         if not (isinstance(actual, dict) and isinstance(actual.get("path"), str)):
             return [f"{where}: expected a file slot {{path: ...}}, found {actual!r}"]
         actual_path = result_dir / actual["path"]
-        if ".." in actual["path"].replace("\\", "/").split("/") or actual["path"].startswith("/"):
-            return [f"{where}: result file path must stay inside the result directory"]
+        try:
+            actual_path.resolve().relative_to(result_dir.resolve())
+        except ValueError:
+            # Lexical '..' and symlinks alike: a result file is produced inside the result
+            # directory, or it is not a result.
+            return [f"{where}: result file '{actual['path']}' resolves outside the result directory"]
         if not actual_path.is_file():
             return [f"{where}: result file '{actual['path']}' does not exist in {result_dir}"]
         return compare_table(resolve_expected_file(test_dir, results_dir, ref), actual_path, tol, where)
@@ -398,16 +447,22 @@ def check_one(case: ProtocolTest, test_dir: Path, result_dir: Path, results_dir:
 # Executor and run record
 # ---------------------------------------------------------------------------
 
-def _is_timestamp(v) -> bool:
+def _parse_timestamp(v):
+    """A timezone-aware datetime, or None. Date-only and naive values are not timestamps."""
     if isinstance(v, datetime):
-        return True
-    if not isinstance(v, str):
-        return False
-    try:
-        datetime.fromisoformat(v.replace("Z", "+00:00"))
-        return True
-    except ValueError:
-        return False
+        dt = v
+    elif isinstance(v, str):
+        try:
+            dt = datetime.fromisoformat(v.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    return dt if dt.tzinfo is not None else None
+
+
+def _is_timestamp(v) -> bool:
+    return _parse_timestamp(v) is not None
 
 
 def load_executor(results_dir: Path) -> dict:
@@ -425,16 +480,13 @@ def load_executor(results_dir: Path) -> dict:
         raise ContractError(f"{path} needs an 'executor' mapping with a non-empty 'agent'")
     for k in ("started", "finished"):
         if not _is_timestamp(data.get(k)):
-            raise ContractError(f"{path} needs '{k}' as an ISO 8601 timestamp")
+            raise ContractError(f"{path} needs '{k}' as an ISO 8601 timestamp with a timezone, such as 2026-10-18T14:02:11Z")
     return data
 
 
 def _stamp(v) -> str:
-    if isinstance(v, datetime):
-        if v.tzinfo is None:
-            v = v.replace(tzinfo=timezone.utc)
-        return v.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return v
+    """Normalised to UTC, since the record says its timestamps are UTC."""
+    return _parse_timestamp(v).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def build_run_record(fm: dict, source: dict, executor: dict, tests: list) -> dict:

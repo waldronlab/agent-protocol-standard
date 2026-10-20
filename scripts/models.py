@@ -218,13 +218,23 @@ def walk_file_refs(obj: Any, prefix: str = "") -> Iterator[Tuple[str, Dict]]:
 
 
 def walk_section_file_refs(section: Dict) -> Iterator[Tuple[str, Dict]]:
-    """File slots inside a section (inputs, expected_outputs). The section's own keys are
-    parameter names, so a parameter called `path` or `url` is not mistaken for a file."""
+    """File slots of a section (inputs, expected_outputs): the direct values whose mapping
+    carries 'path' or 'url'. The section's own keys are parameter names, so a parameter called
+    `path` or `url` is not mistaken for a file."""
     for k, v in (section or {}).items():
-        yield from walk_file_refs(v, str(k))
+        if is_file_mapping(v):
+            yield str(k), v
 
 
 def _check_file_refs(obj: Any, where: str, expected: bool):
+    for k, v in (obj or {}).items():
+        if not is_file_mapping(v):
+            nested = [p for p, _ in walk_file_refs(v, str(k))]
+            if nested:
+                raise ValueError(
+                    f"{where}.{nested[0]}: a file slot must be a direct value of {where}, not nested "
+                    f"inside a mapping or list"
+                )
     for key, raw in walk_section_file_refs(obj):
         try:
             ref = FileRef(**raw)
