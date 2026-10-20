@@ -155,6 +155,9 @@ def _csv_header(test_dir: Path, results_dir: Path, ref: FileRef):
 
 def shape_value(v, test_dir: Path, results_dir: Path, top: bool):
     """Describe v with every value withheld. Nested mapping keys are withheld too."""
+    if top:
+        # The section itself: its keys are parameter names, never a file slot.
+        return {k: shape_value(x, test_dir, results_dir, False) for k, x in v.items()}
     if is_file_mapping(v):
         ref = FileRef(**v)
         slot = {"file": "csv" if ref.is_table else "file"}
@@ -162,8 +165,6 @@ def shape_value(v, test_dir: Path, results_dir: Path, top: bool):
             slot["header"] = "withheld" if ref.header == "withheld" else _csv_header(test_dir, results_dir, ref)
         return slot
     if isinstance(v, dict):
-        if top:
-            return {k: shape_value(x, test_dir, results_dir, False) for k, x in v.items()}
         types = {_type_name(x) for x in v.values()}
         value_type = types.pop() if len(types) == 1 else "any"
         return {"<key>": value_type}
@@ -219,13 +220,19 @@ def resolve_expected_file(test_dir: Path, results_dir: Path, ref: FileRef) -> Pa
     cache = results_dir / CACHE_DIR
     cache.mkdir(parents=True, exist_ok=True)
     target = cache / f"{ref.sha256}{Path(ref.name).suffix}"
-    if not target.is_file():
-        with urllib.request.urlopen(ref.url) as resp:  # noqa: S310 - https enforced by the schema
-            data = resp.read()
-        digest = hashlib.sha256(data).hexdigest()
-        if digest != ref.sha256:
-            raise ContractError(f"downloaded {ref.url} has sha256 {digest}, expected {ref.sha256}")
-        target.write_bytes(data)
+    if target.is_file():
+        # The cache lives in the results directory, which the digest of the source does not
+        # cover, so cached bytes are verified every time they are used.
+        cached = hashlib.sha256(target.read_bytes()).hexdigest()
+        if cached == ref.sha256:
+            return target
+        target.unlink()
+    with urllib.request.urlopen(ref.url) as resp:  # noqa: S310 - https enforced by the schema
+        data = resp.read()
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != ref.sha256:
+        raise ContractError(f"downloaded {ref.url} has sha256 {digest}, expected {ref.sha256}")
+    target.write_bytes(data)
     return target
 
 
@@ -272,7 +279,8 @@ def compare_table(expected_path: Path, actual_path: Path, tol: float, where: str
                     failures.append(f"{cell}: '{ac}', expected '{ec}'")
             else:
                 an = _as_number(ac)
-                if an is None or abs(an - _as_number(ec)) > tol:
+                # Written so that NaN fails: any comparison with NaN is false.
+                if an is None or not (abs(an - _as_number(ec)) <= tol):
                     failures.append(f"{cell}: '{ac}', expected {ec} within {tol}")
     return failures
 
@@ -325,7 +333,7 @@ def compare_value(expected, actual, tol: float, where: str, test_dir: Path, resu
     if _is_number(expected):
         if not _is_number(actual):
             return [f"{where}: {actual!r}, expected the number {expected!r}"]
-        if abs(actual - expected) > tol:
+        if not (abs(actual - expected) <= tol):  # NaN fails: comparisons with NaN are false
             return [f"{where}: {actual!r}, expected {expected!r} within {tol}"]
         return []
     return [f"{where}: unsupported expected value {expected!r}"]
@@ -540,6 +548,11 @@ def main(argv=None) -> int:
         return cmd_shape(tests_dir, results_dir, only) if shape else cmd_check(tests_dir, results_dir, only)
     except ContractError as e:
         print(f"[ERROR] {e}", file=sys.stderr)
+        return 2
+    except (yaml.YAMLError, OSError, UnicodeDecodeError) as e:
+        # Malformed YAML, unreadable files, failed downloads: checking could not complete,
+        # which is exit 2, not the exit 1 reserved for a failed comparison.
+        print(f"[ERROR] {type(e).__name__}: {e}", file=sys.stderr)
         return 2
 
 

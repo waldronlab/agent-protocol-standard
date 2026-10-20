@@ -217,8 +217,15 @@ def walk_file_refs(obj: Any, prefix: str = "") -> Iterator[Tuple[str, Dict]]:
             yield from walk_file_refs(v, f"{prefix}[{i}]")
 
 
+def walk_section_file_refs(section: Dict) -> Iterator[Tuple[str, Dict]]:
+    """File slots inside a section (inputs, expected_outputs). The section's own keys are
+    parameter names, so a parameter called `path` or `url` is not mistaken for a file."""
+    for k, v in (section or {}).items():
+        yield from walk_file_refs(v, str(k))
+
+
 def _check_file_refs(obj: Any, where: str, expected: bool):
-    for key, raw in walk_file_refs(obj):
+    for key, raw in walk_section_file_refs(obj):
         try:
             ref = FileRef(**raw)
         except Exception as exc:
@@ -285,9 +292,10 @@ class Evaluation(BaseModel):
     accepted_outcomes: Optional[List[AcceptedOutcome]] = None
 
     @field_validator('numeric_tolerance')
-    def non_negative(cls, v):
-        if v < 0:
-            raise ValueError("'numeric_tolerance' must be >= 0")
+    def finite_non_negative(cls, v):
+        import math
+        if not math.isfinite(v) or v < 0:
+            raise ValueError("'numeric_tolerance' must be a finite number >= 0")
         return v
 
 

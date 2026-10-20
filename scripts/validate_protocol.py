@@ -9,7 +9,7 @@ from datetime import datetime
 # Make sure scripts directory is in path
 sys.path.insert(0, str(Path(__file__).parent))
 from models import ProtocolFrontmatter, check_renamed_fields, SEMVER_PATTERN, ORCID_PATTERN
-from models import ProtocolTest, walk_file_refs, FileRef
+from models import ProtocolTest, walk_section_file_refs, FileRef
 from repo_utils import detect_repository
 
 
@@ -45,12 +45,12 @@ def load_test_case(test_dir):
     if case.name != test_dir.name:
         errors.append(f"{label}/test.yaml: 'name' is '{case.name}' but the directory is '{test_dir.name}'")
     for section in (case.inputs, case.expected_outputs or {}):
-        for key, raw_ref in walk_file_refs(section):
+        for key, raw_ref in walk_section_file_refs(section):
             ref = FileRef(**raw_ref)
             if ref.path is not None and not (test_dir / ref.path).is_file():
                 errors.append(f"{label}/test.yaml: {key} names '{ref.path}', which does not exist in {label}/")
     for outcome in case.evaluation.accepted_outcomes or []:
-        for key, raw_ref in walk_file_refs(outcome.expected_outputs or {}):
+        for key, raw_ref in walk_section_file_refs(outcome.expected_outputs or {}):
             ref = FileRef(**raw_ref)
             if ref.path is not None and not (test_dir / ref.path).is_file():
                 errors.append(f"{label}/test.yaml: outcome '{outcome.outcome}' {key} names '{ref.path}', which does not exist in {label}/")

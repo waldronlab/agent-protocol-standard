@@ -76,9 +76,18 @@ def test_diagnostic_requires_evidence_and_no_top_level_expectations():
             {"outcome": "r", "expected_absent": ["n"]}, {"outcome": "r", "expected_absent": ["m"]}]}})
 
 
-def test_negative_tolerance_rejected():
-    with pytest.raises(ValidationError, match=">= 0"):
-        ProtocolTest(**exact_case(evaluation={"mode": "exact", "numeric_tolerance": -1}))
+def test_negative_or_non_finite_tolerance_rejected():
+    for bad in (-1, float("nan"), float("inf")):
+        with pytest.raises(ValidationError, match="finite number >= 0"):
+            ProtocolTest(**exact_case(evaluation={"mode": "exact", "numeric_tolerance": bad}))
+
+
+def test_parameter_named_path_is_not_a_file():
+    case = ProtocolTest(**exact_case(inputs={"path": "literal", "url": "also literal"},
+                                     expected_outputs={"path": "out"}))
+    assert case.inputs["path"] == "literal"
+    case = ProtocolTest(**exact_case(inputs={"path": {"path": "input.csv"}}))
+    assert case.inputs["path"] == {"path": "input.csv"}
 
 
 # ---------------------------------------------------------------------------
@@ -284,6 +293,62 @@ def test_table_rules(tmp_path):
     assert "header" in checker.compare_table(exp, act, 1e-6, "t")[0]
     act.write_text("id,x,label\n001,1.0,a\n")                       # row count
     assert "data rows" in checker.compare_table(exp, act, 1e-6, "t")[0]
+
+
+def test_nan_never_passes(tmp_path):
+    cv = lambda e, a, tol=0: checker.compare_value(e, a, tol, "k", tmp_path, tmp_path, tmp_path)  # noqa: E731
+    assert cv(3, float("nan")) and cv(3, float("nan"), 1e9)
+    exp = tmp_path / "exp.csv"
+    act = tmp_path / "act.csv"
+    exp.write_text("id,x\n001,3\n")
+    act.write_text("id,x\n001,NaN\n")
+    assert checker.compare_table(exp, act, 1e9, "t")
+
+
+def test_malformed_executor_is_a_contract_error(repo, tmp_path, capsys):
+    results = tmp_path / "results"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys)
+    passing_results(results)
+    (results / "executor.yaml").write_text("executor: [unclosed\n")
+    assert checker.main([str(tests), str(results)]) == 2
+
+
+def test_shape_section_named_path(tmp_path, capsys):
+    """A top-level key called `path` is a parameter, not a file slot."""
+    case = ProtocolTest(**exact_case(expected_outputs={"path": "out", "n": 1}))
+    s = checker.shape_of(case, tmp_path, tmp_path)
+    assert s["result"] == {"path": "string", "n": "number"}
+
+
+def test_cached_remote_file_is_verified(tmp_path, monkeypatch):
+    from scripts.models import FileRef
+    data = b"id,x\n001,1\n"
+    import hashlib
+    digest = hashlib.sha256(data).hexdigest()
+    ref = FileRef(url="https://example.org/t.csv", sha256=digest)
+    results = tmp_path / "results"
+    cache = results / checker.CACHE_DIR
+    cache.mkdir(parents=True)
+    (cache / f"{digest}.csv").write_bytes(b"id,x\n001,999\n")      # tampered cache
+    calls = []
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            calls.append(1)
+            return data
+
+    monkeypatch.setattr(checker.urllib.request, "urlopen", lambda url: Resp())
+    path = checker.resolve_expected_file(tmp_path, results, ref)
+    assert path.read_bytes() == data and calls == [1]        # re-downloaded, not trusted
+    checker.resolve_expected_file(tmp_path, results, ref)
+    assert calls == [1]                                        # good cache reused
 
 
 def test_compare_value_scalars(tmp_path):
