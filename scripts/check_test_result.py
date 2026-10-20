@@ -21,6 +21,7 @@ from decimal import Decimal, InvalidOperation
 from fractions import Fraction
 import subprocess
 import urllib.request
+import http.client
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -274,8 +275,8 @@ def resolve_expected_file(test_dir: Path, results_dir: Path, ref: FileRef) -> Pa
     try:
         with urllib.request.urlopen(ref.url) as resp:  # noqa: S310 - https enforced by the schema
             data = resp.read()
-    except (OSError, ValueError, UnicodeError) as e:
-        # URLError and HTTPError are OSErrors; http.client.InvalidURL is a ValueError.
+    except (OSError, ValueError, UnicodeError, http.client.HTTPException) as e:
+        # URLError and HTTPError are OSErrors; InvalidURL is an HTTPException.
         raise ContractError(f"could not download {ref.url}: {e}")
     digest = hashlib.sha256(data).hexdigest()
     if digest != ref.sha256:
