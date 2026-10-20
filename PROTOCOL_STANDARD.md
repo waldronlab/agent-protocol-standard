@@ -305,6 +305,7 @@ inputs:                             # everything the executor is given
   data: {path: input.csv}           # a file: path, or url + sha256 (below)
   filter: variance
   theta: 0.4
+  tie_breaker: feature_id_ascending
 expected_outputs:                   # what a correct execution produces
   summary:
     A: 0
@@ -350,7 +351,8 @@ least one of:
 *   `expected_absent`, keys that must not appear in the result. This is how a refusal is checked:
     an executor that refused did not produce the protocol's outputs.
 
-An outcome with neither is invalid, because a label alone is the executor's word. The keys
+An outcome with neither, or with both empty, is invalid, because a label alone is the executor's
+word. The keys
 `outcome` and `observation` are reserved for the executor's report and may appear in neither
 `expected_outputs` nor `expected_absent`; the validator rejects a test that uses them.
 
@@ -446,7 +448,10 @@ tests:
 The executor writes `executor.yaml` at the top of the results directory before invoking the checker,
 containing the `executor` block and the `started` and `finished` timestamps; the checker copies
 them into the record and fills the rest from the test directory and its own version. A missing
-`executor.yaml` is an error, not a guess. Within `executor`, `agent` is required; `harness`,
+`executor.yaml` is an error, not a guess. `protocol_commit` is the commit of the checkout the
+tests directory sits in; if the protocol directory has uncommitted changes, the checker records
+no commit and marks the run `uncommitted: true`, so a record never names a commit that does not
+contain what was executed. Within `executor`, `agent` is required; `harness`,
 `model`, `language`, `invocation`, and `prompt` are optional, since a human executor has no prompt
 and a prompt may hold paths or data its author does not want shared. An agent running a skill
 fills all of them. `invocation.kind` distinguishes a run through a skill, a run with the protocol
