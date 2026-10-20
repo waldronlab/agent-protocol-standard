@@ -329,7 +329,10 @@ A **file** is a mapping with exactly one of two shapes: `{path: <relative path>}
 directory with no `..`, or `{url: <https URL>, sha256: <hex digest>}`. Any other string is a
 literal value, so `data: input.csv` is the string `input.csv`, not a file. The remote form is for
 data too large to commit; the digest is verified after download and a mismatch fails the test. Keep
-local files small.
+local files small. A table slot in `expected_outputs` may add `header: withheld` when the column
+set is itself part of the answer, as in a test that selects columns; the executor then names the
+columns as the protocol directs and the checker compares the header as it compares everything
+else. The default is to show the header in the result shape.
 
 ### Evaluation modes
 
@@ -363,7 +366,8 @@ evaluation:
 An executor, human or agent, is given `inputs`, the **result shape**, and, unless the run is
 deliberately unguided (`invocation.kind: unguided` in the run record), `protocol.md`. The result
 shape is the top-level keys of `expected_outputs` with every value withheld, each file slot with
-its format and, for a table, its header row in order, the evaluation mode, and in `diagnostic`
+its format and, for a table, its header row in order unless the slot says `header: withheld`, the
+evaluation mode, and in `diagnostic`
 mode the outcome labels with the keys each one expects present or absent. Top-level keys are the
 quantities the protocol says to record and are fixed by it. The keys of any nested mapping are
 data, such as feature identifiers, and are withheld: the shape shows a nested mapping as
@@ -387,8 +391,10 @@ test with no result subdirectory is reported as not run, which is neither pass n
 comparison rules:
 
 *   Numbers match within `numeric_tolerance`. Strings, booleans and nulls match exactly. Lists match
-    element by element, in order. Mappings match key by key; a key missing from the result fails,
-    a key present only in the result is ignored.
+    element by element, in order. At the top level of `result.yaml`, a key missing from the result
+    fails and a key present only in the result is ignored, so an executor may record more than the
+    test asks. A nested mapping must have exactly the expected key set, because its membership is
+    data and an extra feature is a wrong answer.
 *   Files are compared as tables. The only table format is CSV: UTF-8, comma delimited, double-quote
     quoting as in RFC 4180, with a header row. A file slot compared as a table must have a name
     ending in `.csv`, in `path` or in the URL; the validator rejects anything else, and no other
