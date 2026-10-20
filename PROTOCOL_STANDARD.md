@@ -279,10 +279,6 @@ These rules are enforced by `scripts/validate_protocol.py`, which runs on every 
 
 ## Tests
 
-*Proposed in ADR 0016. The validator, the checker, and the `test-protocol` skill described here
-are not yet implemented; until they are, CI does not check `tests/` and the commands below do not
-exist. This notice is removed when they do.*
-
 A protocol may carry tests: known inputs with the outputs a correct execution produces. Tests are
 optional. When present they live beside the protocol, one directory per test:
 
@@ -448,7 +444,7 @@ executor:
 checker: check_test_result.py 0.1.0
 tests:
   - name: variance_rows
-    result: pass                # pass | fail
+    result: pass                # pass | fail | not_run (no result subdirectory)
   - name: mean_columns
     result: pass
     outcome: orientation_corrected   # diagnostic mode only
@@ -483,9 +479,10 @@ attached, with the failing comparisons. Which of the executor, its environment, 
 the test is at fault is found out, not assumed: an agent can execute a correct protocol wrongly,
 and measuring how often is what the tests are for.
 
-CI validates each `test.yaml` against this schema and checks that local files exist. It does not
-fetch remote files or execute tests. The `test-protocol` skill in this repository implements the
-result contract for an agent.
+CI validates each `test.yaml` against this schema and checks that local files exist, through the
+same `scripts/validate_protocol.py` that validates `protocol.md`. It does not fetch remote files or
+execute tests. The `test-protocol` skill in this repository implements the result contract for an
+agent.
 
 ## Example Protocol
 

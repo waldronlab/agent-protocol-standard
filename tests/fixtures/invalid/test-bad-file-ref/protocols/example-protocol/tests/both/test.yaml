@@ -1,0 +1,6 @@
+name: both
+description: A file slot with both shapes.
+inputs:
+  data: {path: input.csv, url: https://example.org/input.csv, sha256: "0000000000000000000000000000000000000000000000000000000000000000"}
+expected_outputs: {n: 1}
+evaluation: {mode: exact}

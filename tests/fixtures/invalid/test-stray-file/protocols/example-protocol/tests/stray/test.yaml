@@ -1,0 +1,5 @@
+name: stray
+description: Fine on its own.
+inputs: {theta: 0.5}
+expected_outputs: {n: 1}
+evaluation: {mode: exact}

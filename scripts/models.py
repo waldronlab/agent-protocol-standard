@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Any, Dict, Iterator, Tuple
 from datetime import date, datetime
 import re
 
@@ -146,6 +146,198 @@ class ProtocolFrontmatter(BaseModel):
             raise ValueError("'type: composite' requires a non-empty 'protocols_used'; a composite composes other protocols")
             
         return self
+
+# ---------------------------------------------------------------------------
+# Protocol tests: protocols/<name>/tests/<test-name>/test.yaml (PROTOCOL_STANDARD.md, "Tests")
+# ---------------------------------------------------------------------------
+
+TEST_NAME_PATTERN = r"^[a-z0-9]+([-_][a-z0-9]+)*$"
+SHA256_PATTERN = r"^[0-9a-f]{64}$"
+# Keys the executor's own report uses in diagnostic mode; a test may not expect them.
+RESERVED_RESULT_KEYS = ("outcome", "observation")
+# Keys the checker writes into run.yaml itself; executor.yaml may not supply them.
+RESERVED_RUN_RECORD_KEYS = (
+    "run_record", "protocol", "version", "repository", "protocol_commit",
+    "uncommitted", "source_digest", "checker", "tests",
+)
+
+
+class FileRef(BaseModel):
+    """A file slot: exactly one of {path} or {url, sha256}; `header` only on an expected table."""
+    model_config = {'extra': 'forbid'}
+    path: Optional[str] = None
+    url: Optional[str] = None
+    sha256: Optional[str] = None
+    header: Optional[Literal['shown', 'withheld']] = None
+
+    @model_validator(mode='after')
+    def one_shape(self):
+        if self.path is not None and (self.url is not None or self.sha256 is not None):
+            raise ValueError("a file is either {path} or {url, sha256}, not both")
+        if self.path is None and self.url is None:
+            raise ValueError("a file needs 'path' or 'url'")
+        if self.path is not None:
+            p = self.path
+            if p.startswith('/') or p.startswith('\\') or re.match(r'^[A-Za-z]:', p):
+                raise ValueError(f"'path' must be relative to the test directory, found '{p}'")
+            if '..' in p.replace('\\', '/').split('/'):
+                raise ValueError(f"'path' may not leave the test directory, found '{p}'")
+        if self.url is not None:
+            if not self.url.startswith('https://'):
+                raise ValueError(f"'url' must be https, found '{self.url}'")
+            if self.sha256 is None:
+                raise ValueError("a remote file needs 'sha256'")
+            if not re.match(SHA256_PATTERN, self.sha256):
+                raise ValueError("'sha256' must be 64 lowercase hex characters")
+        return self
+
+    @property
+    def name(self) -> str:
+        return self.path if self.path is not None else self.url.rsplit('/', 1)[-1].split('?')[0]
+
+    @property
+    def is_table(self) -> bool:
+        return self.name.lower().endswith('.csv')
+
+
+def is_file_mapping(value: Any) -> bool:
+    """A mapping is a file slot when it carries 'path' or 'url'; any other mapping is data."""
+    return isinstance(value, dict) and ('path' in value or 'url' in value)
+
+
+def walk_file_refs(obj: Any, prefix: str = "") -> Iterator[Tuple[str, Dict]]:
+    """Yield (dotted key path, raw mapping) for every file slot inside obj."""
+    if is_file_mapping(obj):
+        yield prefix or "<root>", obj
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            yield from walk_file_refs(v, f"{prefix}.{k}" if prefix else str(k))
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            yield from walk_file_refs(v, f"{prefix}[{i}]")
+
+
+def _check_file_refs(obj: Any, where: str, expected: bool):
+    for key, raw in walk_file_refs(obj):
+        try:
+            ref = FileRef(**raw)
+        except Exception as exc:
+            raise ValueError(f"{where}.{key}: {_first_error(exc)}")
+        if ref.header is not None and not (expected and ref.is_table):
+            raise ValueError(f"{where}.{key}: 'header' is only allowed on a table in expected_outputs")
+        if expected and not ref.is_table:
+            raise ValueError(
+                f"{where}.{key}: an expected file must be a CSV table (name ending in .csv); "
+                f"no other file format is defined"
+            )
+
+
+def _first_error(exc: Exception) -> str:
+    errors = getattr(exc, 'errors', None)
+    if callable(errors):
+        try:
+            errs = errors()
+            if errs:
+                loc = ".".join(str(l) for l in errs[0].get('loc', ()))
+                msg = errs[0]['msg'].replace('Value error, ', '')
+                return f"{loc}: {msg}" if loc else msg
+        except Exception:
+            pass
+    return str(exc)
+
+
+def _check_no_reserved(mapping: Dict, where: str):
+    for k in RESERVED_RESULT_KEYS:
+        if k in mapping:
+            raise ValueError(f"{where} may not use the reserved key '{k}'")
+
+
+class AcceptedOutcome(BaseModel):
+    model_config = {'extra': 'forbid'}
+    outcome: str
+    expected_outputs: Optional[Dict[str, Any]] = None
+    expected_absent: Optional[List[str]] = None
+
+    @model_validator(mode='after')
+    def has_evidence(self):
+        if not re.match(TEST_NAME_PATTERN, self.outcome):
+            raise ValueError(f"outcome label must be lower-case words joined by - or _, found '{self.outcome}'")
+        has_outputs = bool(self.expected_outputs)
+        has_absent = bool(self.expected_absent)
+        if not has_outputs and not has_absent:
+            raise ValueError(
+                f"outcome '{self.outcome}' needs evidence: a non-empty 'expected_outputs' or 'expected_absent'"
+            )
+        if has_outputs:
+            _check_no_reserved(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs")
+            _check_file_refs(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs", expected=True)
+        if has_absent:
+            for k in self.expected_absent:
+                if k in RESERVED_RESULT_KEYS:
+                    raise ValueError(f"outcome '{self.outcome}' expected_absent may not name the reserved key '{k}'")
+        return self
+
+
+class Evaluation(BaseModel):
+    model_config = {'extra': 'forbid'}
+    mode: Literal['exact', 'diagnostic']
+    numeric_tolerance: float = 0.0
+    accepted_outcomes: Optional[List[AcceptedOutcome]] = None
+
+    @field_validator('numeric_tolerance')
+    def non_negative(cls, v):
+        if v < 0:
+            raise ValueError("'numeric_tolerance' must be >= 0")
+        return v
+
+
+class ProtocolTest(BaseModel):
+    """The schema of one test.yaml."""
+    model_config = {'extra': 'forbid'}
+    name: str
+    description: str
+    inputs: Dict[str, Any]
+    expected_outputs: Optional[Dict[str, Any]] = None
+    evaluation: Evaluation
+
+    @field_validator('name')
+    def validate_name(cls, v):
+        if not re.match(TEST_NAME_PATTERN, v):
+            raise ValueError(f"'name' must be lower-case words joined by - or _, found '{v}'")
+        return v
+
+    @field_validator('description')
+    def validate_description(cls, v):
+        if not v.strip():
+            raise ValueError("'description' must not be blank")
+        return v
+
+    @model_validator(mode='after')
+    def mode_consistency(self):
+        _check_file_refs(self.inputs, "inputs", expected=False)
+        if self.evaluation.mode == 'exact':
+            if not self.expected_outputs:
+                raise ValueError("mode 'exact' requires a non-empty 'expected_outputs'; a test that checks nothing is invalid")
+            if self.evaluation.accepted_outcomes:
+                raise ValueError("mode 'exact' does not use 'accepted_outcomes'")
+            _check_no_reserved(self.expected_outputs, "expected_outputs")
+            _check_file_refs(self.expected_outputs, "expected_outputs", expected=True)
+        else:
+            if self.expected_outputs is not None:
+                raise ValueError("mode 'diagnostic' puts expectations under each accepted outcome, not at the top level")
+            if not self.evaluation.accepted_outcomes:
+                raise ValueError("mode 'diagnostic' requires a non-empty 'accepted_outcomes'")
+            labels = [o.outcome for o in self.evaluation.accepted_outcomes]
+            if len(set(labels)) != len(labels):
+                raise ValueError("accepted outcome labels must be unique")
+        return self
+
+    def outcome(self, label: str) -> Optional[AcceptedOutcome]:
+        for o in self.evaluation.accepted_outcomes or []:
+            if o.outcome == label:
+                return o
+        return None
+
 
 def check_renamed_fields(data: dict):
     # This must run before Pydantic parsing if we want to catch renamed fields

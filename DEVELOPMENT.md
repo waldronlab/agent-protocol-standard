@@ -76,6 +76,16 @@ def test_composite_requires_dependencies():
         ProtocolFrontmatter(**bad_dict)
 ```
 
+## Protocol Tests
+
+The `test.yaml` schema is `TestCase` in `scripts/models.py`, beside the frontmatter model, and
+`validate_protocol.py` applies it to every `tests/<name>/` under a protocol. `scripts/check_test_result.py`
+is the checker: `--shape` prints what an executor must produce and snapshots the source, the plain
+invocation compares results and writes `run.yaml`. `tests/test_protocol_tests.py` covers the schema in
+memory, the validator against `tests/fixtures/valid/with-tests` and the `invalid/test-*` fixtures, and
+the checker end to end in a throwaway git repository. A rule added to the "Tests" section of the
+standard gets a fixture or a checker test, as for the frontmatter.
+
 ## Updating the Template and Fixtures
 If your schema change adds a new required field, ensure you also update `template/protocols/example-protocol/protocol.md` so that future protocols scaffolded from the template do not immediately fail validation.
 

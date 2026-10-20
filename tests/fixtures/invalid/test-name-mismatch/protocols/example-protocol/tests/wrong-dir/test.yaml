@@ -1,0 +1,5 @@
+name: right-name
+description: Directory and name disagree.
+inputs: {theta: 0.5}
+expected_outputs: {n: 1}
+evaluation: {mode: exact}

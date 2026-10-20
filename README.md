@@ -20,7 +20,7 @@ An "AI Agent Protocol" is related to but different than an [AI Skill](https://gi
 *   **AI Agent Protocol**: A scientific workflow, experimental plan, or analytical pipeline designed to be executed by or in collaboration with an AI agent. Protocols in this registry are **designed around provenance to published methods**. Protocols:
     - are formal records providing citation both to primary scientific literature and to publication of protocols (#4). Atomic protocols have a single purpose with a single citation to primary literature; composite protocols may be composed of multiple atomic protocols.
     - will record **human reviews** (#2)
-    - will support **formal unit tests/benchmarks** (#3) to verify correct execution by different AI agents and models. 
+    - may carry **tests** (#3, ADR 0016): known inputs and expected outputs under `tests/`, checked by a deterministic script, so that execution by different AI agents and models can be verified.
 
 ## Utility and Core Use Cases
 

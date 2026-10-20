@@ -24,6 +24,14 @@ itself needs to change, open an issue there rather than working around it here.
 4. Open a pull request. CI validates every protocol in the repository and will tell you precisely
    what is wrong.
 
+## Adding tests to a protocol
+
+Optional. A test is a directory `protocols/<name>/tests/<test-name>/` holding `test.yaml` and any
+small data files; the format is the "Tests" section of `PROTOCOL_STANDARD.md`, and
+`protocols/example-protocol/tests/` in the template is a worked example. CI validates `test.yaml`
+and checks that the files it names exist. It does not run the tests; the `test-protocol` skill in
+`waldronlab/agent-protocol-standard` does that, on your machine, with your agent.
+
 ## Changing an existing protocol
 
 Bump `version:` and `date:`, and add a matching entry at the **top** of `## History & Reviews` with

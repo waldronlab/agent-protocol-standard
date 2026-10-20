@@ -1,0 +1,16 @@
+name: basic
+description: Mean filtering with features in rows.
+inputs:
+  data: {path: input.csv}
+  filter: mean
+  theta: 0.5
+expected_outputs:
+  summary: {A: 1, B: 3, C: 6.5, D: 10}
+  n_eligible: 4
+  m: 2
+  cutoff: 3
+  removed_features: [A, B]
+  retained_matrix: {path: retained.csv}
+evaluation:
+  mode: exact
+  numeric_tolerance: 1.0e-12
