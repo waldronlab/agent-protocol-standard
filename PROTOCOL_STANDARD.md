@@ -388,7 +388,10 @@ attributed to. It is taken before execution because the checkout can move afterw
 
 The executor performs the protocol in any language and writes its results into a **results
 directory** of its choosing, one subdirectory per test named after the test, each holding
-`result.yaml` and any output files. It does not read `expected_outputs` itself.
+`result.yaml` and any output files. The results directory must be empty when `--shape` writes
+`source.yaml` into it, so a run can never be checked against a previous run's files, and it must
+lie outside the protocol directory, whose digest it would otherwise change. The checker refuses
+both. The executor does not read `expected_outputs` itself.
 
 *   In `exact` mode, `result.yaml` has one key per key of `expected_outputs`. A file slot is filled
     with `{path: <file in that test's result subdirectory>}`.
@@ -429,6 +432,7 @@ version: 1.2.1
 repository: waldronlab/agent-protocols
 protocol_commit: 844ce92        # commit the protocol and tests were read at, from source.yaml
 uncommitted: false              # true, with no commit, if the checkout was dirty
+source_digest: sha256:9f2c...   # digest of protocol.md and tests/, from source.yaml
 started: 2026-10-18T14:02:11Z   # UTC timestamps, from the executor
 finished: 2026-10-18T14:09:40Z
 executor:
@@ -466,7 +470,7 @@ different experiments. Additional keys, at the top level of `executor.yaml` or
 under `executor`, are permitted and preserved, so a study that records cost, token counts,
 attempts, or an experimental condition adds them without a schema change. The keys the checker
 writes itself, `run_record`, `protocol`, `version`, `repository`, `protocol_commit`,
-`uncommitted`, `checker`, and `tests`, are reserved: an `executor.yaml` that supplies any of them is rejected rather than
+`uncommitted`, `source_digest`, `checker`, and `tests`, are reserved: an `executor.yaml` that supplies any of them is rejected rather than
 silently overridden. `run_record` is incremented when a defined key changes meaning.
 
 Where run records are kept is not yet defined (issue #44). Attach the record to the pull request or
