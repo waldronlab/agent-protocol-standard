@@ -309,6 +309,9 @@ expected_outputs:                   # what a correct execution produces
   summary:
     A: 0
     B: 1.3333333333333333
+    C: 1.3333333333333333
+    D: 33.333333333333336
+    E: 48
   removed_features: [A, B]
   retained_matrix: {path: retained.csv}   # a file, compared as a table
 evaluation:
@@ -347,7 +350,9 @@ least one of:
 *   `expected_absent`, keys that must not appear in the result. This is how a refusal is checked:
     an executor that refused did not produce the protocol's outputs.
 
-An outcome with neither is invalid, because a label alone is the executor's word.
+An outcome with neither is invalid, because a label alone is the executor's word. The keys
+`outcome` and `observation` are reserved for the executor's report and may appear in neither
+`expected_outputs` nor `expected_absent`; the validator rejects a test that uses them.
 
 ```yaml
 evaluation:
@@ -448,8 +453,10 @@ fills all of them. `invocation.kind` distinguishes a run through a skill, a run 
 text supplied in context, and a run given no protocol at all; two runs that differ only there are
 different experiments. Additional keys, at the top level of `executor.yaml` or
 under `executor`, are permitted and preserved, so a study that records cost, token counts,
-attempts, or an experimental condition adds them without a schema change. `run_record` is
-incremented when a defined key changes meaning.
+attempts, or an experimental condition adds them without a schema change. The keys the checker
+writes itself, `run_record`, `protocol`, `version`, `repository`, `protocol_commit`, `checker`, and
+`tests`, are reserved: an `executor.yaml` that supplies any of them is rejected rather than
+silently overridden. `run_record` is incremented when a defined key changes meaning.
 
 Where run records are kept is not yet defined (issue #44). Attach the record to the pull request or
 issue it is relevant to.
