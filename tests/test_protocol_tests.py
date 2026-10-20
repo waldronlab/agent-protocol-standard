@@ -509,6 +509,60 @@ def test_remote_input_path_is_absolute_for_relative_results_dir(repo, tmp_path, 
     assert Path(out["tests"][0]["inputs"]["data"]["path"]).is_absolute()
 
 
+def test_url_validation_and_name():
+    from scripts.models import FileRef
+    d = "a" * 64
+    for bad in ("https:///input.csv", "https://example.org:nope/input.csv", "ftp://example.org/x.csv"):
+        with pytest.raises(ValidationError):
+            FileRef(url=bad, sha256=d)
+    ref = FileRef(url="https://example.org/expected.csv?token=a/b", sha256=d)
+    assert ref.name == "expected.csv" and ref.is_table
+
+
+def test_unsupported_expectation_types_rejected():
+    import datetime
+    with pytest.raises(ValidationError, match="unsupported value of type date"):
+        ProtocolTest(**exact_case(expected_outputs={"day": datetime.date(2026, 10, 18)}))
+    with pytest.raises(ValidationError, match="unsupported value"):
+        ProtocolTest(**{"name": "d", "description": "x", "inputs": {},
+                        "evaluation": {"mode": "diagnostic", "accepted_outcomes": [
+                            {"outcome": "r", "expected_outputs": {"when": [datetime.datetime(2026, 1, 1)]}}]}})
+
+
+def test_tolerance_boundary_is_exact(tmp_path):
+    exp, act = tmp_path / "exp.csv", tmp_path / "act.csv"
+    exp.write_text("id,x\n001,0\n")
+    act.write_text("id,x\n001,1.0000000000000000000000000001e-12\n")
+    assert checker.compare_table(exp, act, 1e-12, "t")          # just outside
+    act.write_text("id,x\n001,1e-12\n")
+    assert checker.compare_table(exp, act, 1e-12, "t") == []    # on the boundary
+
+
+def test_ignored_input_is_uncommitted(repo, tmp_path, capsys):
+    (repo / ".gitignore").write_text("*.secret\n")
+    subprocess.run(["git", "-C", str(repo), "add", ".gitignore"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "ignore"], check=True)
+    (repo / "protocols/example-protocol/tests/basic/extra.secret").write_text("x")
+    results = tmp_path / "results"
+    assert shape(repo, results, capsys)[0] == 0
+    source = yaml.safe_load((results / "source.yaml").read_text())
+    assert source["uncommitted"] is True and source["protocol_commit"] is None
+
+
+def test_symlinked_result_yaml_fails(repo, tmp_path, capsys):
+    tests = repo / "protocols/example-protocol/tests"
+    results = tmp_path / "results"
+    shape(repo, results, capsys)
+    old = tmp_path / "old"
+    passing_results(old)
+    passing_results(results)
+    (results / "basic/result.yaml").unlink()
+    (results / "basic/result.yaml").symlink_to(old / "basic/result.yaml")
+    executor(results)
+    assert checker.main(["--test", "basic", str(tests), str(results)]) == 1
+    assert "symlink" in capsys.readouterr().out
+
+
 def test_compare_value_scalars(tmp_path):
     cv = lambda e, a, tol=0: checker.compare_value(e, a, tol, "k", tmp_path, tmp_path, tmp_path)  # noqa: E731
     assert cv(1, 1.0) == []

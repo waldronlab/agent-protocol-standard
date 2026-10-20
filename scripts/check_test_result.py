@@ -18,6 +18,7 @@ import os
 import csv
 import hashlib
 from decimal import Decimal, InvalidOperation
+from fractions import Fraction
 import subprocess
 import urllib.request
 from pathlib import Path
@@ -129,7 +130,10 @@ def _git(protocol_dir: Path, *args):
 def source_snapshot(protocol_dir: Path) -> dict:
     commit = _git(protocol_dir, "rev-parse", "--short=7", "HEAD")
     status = _git(protocol_dir, "status", "--porcelain", "--untracked-files=all", "--", ".")
-    uncommitted = commit is None or (status is None) or bool(status)
+    # git status omits ignored files, but the digest covers them; an ignored input is still
+    # content the commit does not contain.
+    ignored = _git(protocol_dir, "ls-files", "--others", "--ignored", "--exclude-standard", "--", ".")
+    uncommitted = commit is None or status is None or bool(status) or bool(ignored)
     snapshot = {
         "protocol_commit": None if uncommitted else commit,
         "uncommitted": uncommitted,
@@ -301,7 +305,8 @@ def _within(actual: Decimal, expected: Decimal, tol: Decimal) -> bool:
         return False
     if actual.is_infinite() or expected.is_infinite():
         return actual == expected
-    return abs(actual - expected) <= tol
+    # Exact rational arithmetic: the Decimal context would round a boundary difference.
+    return abs(Fraction(actual) - Fraction(expected)) <= Fraction(tol)
 
 
 # ---------------------------------------------------------------------------
@@ -416,6 +421,10 @@ def compare_top(expected: dict, result: dict, tol: float, test_dir: Path, result
 def check_one(case: ProtocolTest, test_dir: Path, result_dir: Path, results_dir: Path) -> dict:
     entry = {"name": case.name}
     result_yaml = result_dir / RESULT_FILE
+    if result_yaml.is_symlink():
+        entry["result"] = "fail"
+        entry["failures"] = [f"{result_yaml} is a symlink; a result is written in place"]
+        return entry
     if not result_yaml.is_file():
         entry["result"] = "fail"
         entry["failures"] = [f"{result_dir / RESULT_FILE} does not exist"]

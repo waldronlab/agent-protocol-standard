@@ -183,8 +183,15 @@ class FileRef(BaseModel):
             if '..' in p.replace('\\', '/').split('/'):
                 raise ValueError(f"'path' may not leave the test directory, found '{p}'")
         if self.url is not None:
-            if not self.url.startswith('https://'):
-                raise ValueError(f"'url' must be https, found '{self.url}'")
+            from urllib.parse import urlsplit
+            try:
+                parts = urlsplit(self.url)
+                port = parts.port  # raises ValueError on a malformed port
+            except ValueError:
+                raise ValueError(f"'url' is malformed: '{self.url}'")
+            if parts.scheme != 'https' or not parts.hostname:
+                raise ValueError(f"'url' must be an https URL with a host, found '{self.url}'")
+            del port
             if self.sha256 is None:
                 raise ValueError("a remote file needs 'sha256'")
             if not re.match(SHA256_PATTERN, self.sha256):
@@ -193,7 +200,10 @@ class FileRef(BaseModel):
 
     @property
     def name(self) -> str:
-        return self.path if self.path is not None else self.url.rsplit('/', 1)[-1].split('?')[0]
+        if self.path is not None:
+            return self.path
+        from urllib.parse import urlsplit
+        return urlsplit(self.url).path.rsplit('/', 1)[-1]
 
     @property
     def is_table(self) -> bool:
@@ -263,6 +273,27 @@ def _first_error(exc: Exception) -> str:
     return str(exc)
 
 
+_SUPPORTED_SCALARS = (str, int, float, bool, type(None))
+
+
+def _check_supported_values(obj: Any, where: str):
+    """Expectations are strings, numbers, booleans, nulls, lists, mappings, and file slots.
+    YAML also produces dates and timestamps, which the checker cannot compare; quote them."""
+    if is_file_mapping(obj):
+        return
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            _check_supported_values(v, f"{where}.{k}")
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            _check_supported_values(v, f"{where}[{i}]")
+    elif not isinstance(obj, _SUPPORTED_SCALARS):
+        raise ValueError(
+            f"{where}: unsupported value of type {type(obj).__name__}; expectations are strings, "
+            f"numbers, booleans, nulls, lists, mappings, or file slots (quote a date to compare it as a string)"
+        )
+
+
 def _check_no_reserved(mapping: Dict, where: str):
     for k in RESERVED_RESULT_KEYS:
         if k in mapping:
@@ -288,6 +319,7 @@ class AcceptedOutcome(BaseModel):
         if has_outputs:
             _check_no_reserved(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs")
             _check_file_refs(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs", expected=True)
+            _check_supported_values(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs")
         if has_absent:
             for k in self.expected_absent:
                 if k in RESERVED_RESULT_KEYS:
@@ -340,6 +372,7 @@ class ProtocolTest(BaseModel):
                 raise ValueError("mode 'exact' does not use 'accepted_outcomes'")
             _check_no_reserved(self.expected_outputs, "expected_outputs")
             _check_file_refs(self.expected_outputs, "expected_outputs", expected=True)
+            _check_supported_values(self.expected_outputs, "expected_outputs")
         else:
             if self.expected_outputs is not None:
                 raise ValueError("mode 'diagnostic' puts expectations under each accepted outcome, not at the top level")
