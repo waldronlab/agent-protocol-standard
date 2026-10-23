@@ -61,7 +61,7 @@ def main():
         sys.exit(f"Could not read {len(unreadable)} protocol(s): {unreadable_str}. Refusing to write an index that omits them.")
         
     index = {
-        'spec_version': '0.1.0',
+        'spec_version': '0.2.0',
         'repository': repository_name,
         'generated_at': datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         'protocols': protocols_list
