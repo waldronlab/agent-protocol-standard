@@ -9,6 +9,9 @@ version with it.
 *   [`test-protocol`](test-protocol/SKILL.md) — runs the tests a protocol carries under `tests/`,
     writes results in the standard's result contract, and hands them to
     `scripts/check_test_result.py`, which decides pass or fail and writes the run record.
+*   [`update-protocol`](update-protocol/SKILL.md): bumps a protocol's version and date, inserts
+    the matching `## History & Reviews` entry from the author's change description, and updates
+    the pin in every same-repository composite that depends on it, each with its own patch bump.
 
 ## Why these live here
 
