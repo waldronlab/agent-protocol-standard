@@ -320,8 +320,10 @@ class AcceptedOutcome(BaseModel):
             raise ValueError(
                 f"outcome '{self.outcome}' needs evidence: a non-empty 'expected_outputs' or 'expected_absent'"
             )
-        if self.expected_warning is not None and not self.expected_warning.strip():
-            raise ValueError(f"outcome '{self.outcome}' 'expected_warning' must not be blank")
+        if self.expected_warning is not None:
+            self.expected_warning = self.expected_warning.strip()
+            if not self.expected_warning:
+                raise ValueError(f"outcome '{self.outcome}' 'expected_warning' must not be blank")
         if has_outputs:
             _check_no_reserved(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs")
             _check_file_refs(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs", expected=True)

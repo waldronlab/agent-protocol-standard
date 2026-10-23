@@ -362,7 +362,7 @@ else. The default is to show the header in the result shape.
 **`exact`**: every entry in `expected_outputs` must be present in the result and match.
 `expected_outputs` must have at least one entry; a test that checks nothing is invalid.
 
-**`diagnostic`**: the input violates a requirement the protocol states, and the test checks what the
+**`diagnostic`**: the input fails a condition in Materials, and the test checks what the
 executor does about it. `evaluation.accepted_outcomes` lists the outcomes that count as correct.
 The top-level `expected_outputs` is omitted; each outcome carries its own evidence instead, at
 least one of:
@@ -469,10 +469,10 @@ executor:
   language: R                   # what the execution was written in, if known
   invocation:                   # how the protocol reached the agent
     kind: skill                 # skill | in-context | unguided
-    skill: test-protocol 0.1.0  # name and version, for kind: skill
+    skill: test-protocol 0.2.0  # name and version, for kind: skill
   prompt: |                     # verbatim text that started the run
     Run the tests for independent-filtering-variance.
-checker: check_test_result.py 0.1.0
+checker: check_test_result.py 0.2.0
 tests:
   - name: variance_rows
     result: pass                # pass | fail | not_run (no result subdirectory)

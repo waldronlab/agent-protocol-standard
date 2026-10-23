@@ -456,14 +456,11 @@ def check_one(case: ProtocolTest, test_dir: Path, result_dir: Path, results_dir:
 
     tol = case.evaluation.numeric_tolerance
     warnings = result.get("warnings")
-    if warnings is not None and not (isinstance(warnings, list) and all(isinstance(w, str) for w in warnings)):
-        entry["result"] = "fail"
-        entry["failures"] = ["warnings: must be a list of strings"]
-        return entry
+    warnings_ok = warnings is None or (isinstance(warnings, list) and all(isinstance(w, str) for w in warnings))
+    failures = [] if warnings_ok else ["warnings: must be a list of strings"]
     if case.evaluation.mode == "exact":
-        failures = compare_top(case.expected_outputs, result, tol, test_dir, result_dir, results_dir)
+        failures += compare_top(case.expected_outputs, result, tol, test_dir, result_dir, results_dir)
     else:
-        failures = []
         label = result.get("outcome")
         outcome = case.outcome(label) if isinstance(label, str) else None
         if outcome is None:
@@ -480,7 +477,7 @@ def check_one(case: ProtocolTest, test_dir: Path, result_dir: Path, results_dir:
                     failures.append(f"{k}: present in result.yaml, but outcome '{label}' requires it absent")
             if outcome.expected_warning:
                 needle = outcome.expected_warning.casefold()
-                if not any(needle in w.casefold() for w in warnings or []):
+                if not warnings_ok or not any(needle in w.casefold() for w in warnings or []):
                     failures.append(
                         f"warnings: no entry contains {outcome.expected_warning!r}, which outcome '{label}' requires"
                     )

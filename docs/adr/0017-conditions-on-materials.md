@@ -47,8 +47,8 @@ is not reinterpreted.
 phrase that must appear in the executor's `warnings`. It accompanies evidence (`expected_outputs`
 or `expected_absent`) rather than replacing it, since a warning is the executor's word as much as
 the outcome label is. `result.yaml` may carry `warnings`, a list of strings, in either mode;
-`warnings` joins `outcome` and `observation` as a reserved key. The result shape shows that
-`warnings` exists and withholds the phrase, so an executor warns because the protocol said to, not
+`warnings` joins `outcome` and `observation` as a reserved key. The diagnostic result shape names
+`warnings` and withholds the phrase, so an executor warns because the protocol said to, not
 because the shape did.
 
 The protocol-runner skill checks Materials before Step 1 and lists warnings with the departures.

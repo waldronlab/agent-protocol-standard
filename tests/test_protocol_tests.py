@@ -163,6 +163,7 @@ def passing_results(results: Path):
     (results / "basic" / "retained.csv").write_text("feature,sample_1,sample_2\nC,5,8.0\nD,10,10\n")
     write_yaml(results / "orientation" / "result.yaml", {
         "outcome": "orientation_corrected", "observation": "Transposed the input.",
+        # the orientation test's corrected outcome carries expected_warning, so this is required
         "warnings": ["Features were in columns; the orientation was corrected before filtering."],
         "removed_features": ["A", "B"], "retained_features": ["C", "D"],
         "retained_matrix": {"path": "kept.csv"},

@@ -1,0 +1,9 @@
+name: blank-warning
+description: A diagnostic outcome whose expected_warning is blank.
+inputs: {theta: 0.5}
+evaluation:
+  mode: diagnostic
+  accepted_outcomes:
+    - outcome: warned
+      expected_outputs: {n: 1}
+      expected_warning: "   "

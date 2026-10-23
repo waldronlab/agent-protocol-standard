@@ -108,7 +108,7 @@ silent substitution this skill is meant to prevent:
 
 1. After execution completes, emit a final "Departures from protocol" section.
 2. List any deviations made during execution (e.g., using a different parameter value, skipping a step, or substituting a package). This is a normal part of adapting a protocol; recording it is what matters for provenance.
-3. List every warning given in step 6.1, with the condition that was not met. A warning given and not recorded is lost to the reader of the Methods section, who is the person it was for.
+3. List every warning given in step 6.1, with the condition that was not met.
 
 ### 8. Generate Draft Methods Section
 
