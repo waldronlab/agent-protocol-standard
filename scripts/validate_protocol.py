@@ -438,6 +438,20 @@ def validate_protocol(file_path, protocols_dir, this_repository=None):
                 dep_path = os.path.join(protocols_dir, dep.name, "protocol.md")
                 if not os.path.exists(dep_path):
                     errors.append(f"Dependent protocol '{dep.name}' not found at '{dep_path}'")
+                    continue
+                # A dependency whose frontmatter will not parse reports that itself when the
+                # tree is validated; only a readable version is compared against the pin.
+                try:
+                    dep_frontmatter = extract_frontmatter(dep_path)
+                except Exception:
+                    dep_frontmatter = None
+                if isinstance(dep_frontmatter, dict):
+                    dep_version = str(dep_frontmatter.get('version', ''))
+                    if dep_version != dep.version:
+                        errors.append(
+                            f"'protocols_used' pins '{dep.name}' at version '{dep.version}' but "
+                            f"'{dep_path}' declares version '{dep_version}'; the pin is exact, so update the pin"
+                        )
 
     n_tests, test_errors = validate_tests_dir(os.path.dirname(file_path))
     errors.extend(test_errors)
