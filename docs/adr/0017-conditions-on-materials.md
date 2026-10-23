@@ -1,8 +1,8 @@
 # 0017. Conditions on Materials: Where They Live and What a Violation Means
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-23
-- **Deciders:** Levi Waldron (User), AI Agent
+- **Deciders:** Levi Waldron
 
 ## Context and Problem Statement
 
@@ -56,10 +56,9 @@ The test-protocol skill writes them into `result.yaml`.
 
 ## Alternatives Considered
 
-- **One tier: every condition is a requirement.** Rejected. The rarefaction case is the common
-  one in microbiome work: the computation is well defined on the input, and the problem is with
-  what the user does with the output. Refusing would push authors to write the condition as a note,
-  which is where it was.
+- **One tier: every condition is a requirement.** Rejected. In the rarefaction case, the computation
+  is well defined on the input, and the problem is with how the user may interpret the
+  output. Refusing would push authors to write the condition as a note, which is where it was.
 - **A required "Step 1: Validate".** Rejected. It restates Materials, drifts from it, and puts the
   answer to "what are the inputs" in two places. Existing protocols that have one remain valid; the
   step is now redundant rather than wrong.
