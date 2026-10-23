@@ -1,3 +1,12 @@
+# agent-protocol-standard 0.4.1 (2026-10-23)
+
+## SIGNIFICANT USER-VISIBLE CHANGES
+
+* `spec_version` in the generated index becomes `0.2.0`. The format changed in
+  ADRs 0012, 0014, 0016, and 0017 while the index kept announcing `0.1.0`; the
+  format axis moves separately from the tooling (ADR 0009), and this is the
+  first time it has moved since.
+
 # agent-protocol-standard 0.4.0 (2026-10-23)
 
 Tooling release. The format changed as well (ADRs 0012, 0014, 0016, 0017);
