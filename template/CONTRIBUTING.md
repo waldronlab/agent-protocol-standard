@@ -9,8 +9,10 @@ itself needs to change, open an issue there rather than working around it here.
 
 ## Adding a protocol
 
-1. Create `protocols/<name>/protocol.md`. The directory name must exactly match the `name` field in
-   the YAML frontmatter.
+1. Create `protocols/<name>/protocol.md`, starting from a copy of `protocols/example-protocol/`.
+   The directory name must exactly match the `name` field in the YAML frontmatter. Every optional
+   item in the example is marked `Optional, delete if unneeded.`: fill it in or delete it, and
+   remove the marker either way. Searching for the marker finds whatever is still undecided.
 2. Fill in the required frontmatter — `name`, `description`, `version`, `authors`, `date`, `status`,
    `protocol_citation` — and the provenance fields that apply. `protocol_citation` answers *who published
    these instructions*: normally the paper you transcribed the procedure from. Only where no publication

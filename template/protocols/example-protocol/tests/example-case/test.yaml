@@ -1,3 +1,5 @@
+# Optional, delete if unneeded. The whole tests/ directory is optional; delete it unless you
+# replace this example with a real test of your protocol.
 # One test: known inputs, and the outputs a correct execution of protocol.md produces.
 # The directory name must match `name`. See the "Tests" section of PROTOCOL_STANDARD.md.
 name: example-case

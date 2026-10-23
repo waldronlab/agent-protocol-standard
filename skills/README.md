@@ -9,6 +9,9 @@ version with it.
 *   [`test-protocol`](test-protocol/SKILL.md) — runs the tests a protocol carries under `tests/`,
     writes results in the standard's result contract, and hands them to
     `scripts/check_test_result.py`, which decides pass or fail and writes the run record.
+*   [`create-protocol`](create-protocol/SKILL.md): scaffolds a new protocol from the template in
+    this repository, fills the frontmatter from the current schema, asks the two citation
+    questions separately, walks every optional item, and validates before reporting.
 
 ## Why these live here
 
