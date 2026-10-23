@@ -1,7 +1,7 @@
 ---
 name: protocol-runner
 description: Search, retrieve, evaluate trust, and execute citable workflows from federated protocol repositories
-version: 2.0.0
+version: 2.1.0
 category: protocols
 author: waldronlab
 tags: [workflow, protocol, pipeline, method_origin_citation, provenance]
@@ -96,15 +96,19 @@ silent substitution this skill is meant to prevent:
 
 ### 6. Execute Protocol
 
-1. Follow the steps in the fetched protocol content in order.
-2. **Resource Discovery**: Agents can discover and download pre-computed reference data and upstream tools using the `database_urls` and `upstream_repositories` YAML fields provided in the index.
-3. Adapt the provided code to the user's specific environment, file paths, parameters, and organisms as necessary.
-4. If a step cannot be followed exactly as written, or requires a different package version than specified, note this departure inline.
+1. **Check the materials before Step 1.** Every condition in `## Materials` is written with *must* or *should* (PROTOCOL_STANDARD.md, "Markdown Content Structure"). Check each against the inputs the user supplied:
+   - A *must* condition that fails: stop, report which condition failed and on which input, and produce none of the protocol's outputs.
+   - A *should* condition that fails: warn the user, naming the condition and the consequence the protocol gives for it, then continue. Record the warning for step 7.
+2. Follow the steps in the fetched protocol content in order.
+3. **Resource Discovery**: Agents can discover and download pre-computed reference data and upstream tools using the `database_urls` and `upstream_repositories` YAML fields provided in the index.
+4. Adapt the provided code to the user's specific environment, file paths, parameters, and organisms as necessary.
+5. If a step cannot be followed exactly as written, or requires a different package version than specified, note this departure inline.
 
 ### 7. Record Departures
 
 1. After execution completes, emit a final "Departures from protocol" section.
 2. List any deviations made during execution (e.g., using a different parameter value, skipping a step, or substituting a package). This is a normal part of adapting a protocol; recording it is what matters for provenance.
+3. List every warning given in step 6.1, with the condition that was not met. A warning given and not recorded is lost to the reader of the Methods section, who is the person it was for.
 
 ### 8. Generate Draft Methods Section
 

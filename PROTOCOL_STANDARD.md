@@ -158,6 +158,23 @@ The markdown body must contain a `## Materials` section and a `## Steps` section
 `### Step` heading, and `## History & Reviews` must be the last section. A document with metadata but no
 materials and no steps is not a protocol, however complete its frontmatter is, and CI rejects it.
 
+`## Materials` lists every input the protocol consumes (data, parameters, software, reference data)
+and every condition an input must or should satisfy. Steps consume materials; they do not introduce
+new conditions on inputs. Statements about what the protocol does or does not do belong in the
+overview or `## Notes`, not in Materials.
+
+A condition on a material is written with **must** or **should**, in the sense of RFC 2119, and an
+executor checks every condition before Step 1:
+
+*   A condition written with **must** is a requirement. An executor that finds it violated stops,
+    reports which condition failed, and produces none of the protocol's outputs.
+*   A condition written with **should** is an advisory. The executor proceeds, warns the user naming
+    the condition and its consequence, and records the warning with the execution.
+
+This applies to conditions written in a protocol's Materials section. The standard's own prose uses
+these words in their ordinary sense. A check that can only be made during computation, such as a
+sample whose total is zero, belongs in the step where it arises.
+
 The remaining structure is a recommendation rather than a requirement, and follows it for compatibility
 with future export tools such as protocols.io integration:
 
@@ -168,6 +185,11 @@ Brief overview (1-2 sentences).
 
 ## Materials
 
+- **Input data:**
+  - `input table` — what it is, and its conditions: columns must be ..., values should be ...;
+    if they are not, warn that ...
+- **Parameters:**
+  - `theta` — what it controls, its default, and the values it must take.
 - **Software & Repositories:**
   - `ToolName` ([Repository URL]) — Description/version.
 - **Databases & Reference Data:**
@@ -350,9 +372,12 @@ least one of:
     an executor that refused did not produce the protocol's outputs.
 
 An outcome with neither, or with both empty, is invalid, because a label alone is the executor's
-word. The keys
-`outcome` and `observation` are reserved for the executor's report and may appear in neither
-`expected_outputs` nor `expected_absent`; the validator rejects a test that uses them.
+word. An outcome may add `expected_warning`, a phrase that must appear, case-insensitively, in
+one of the executor's `warnings`. This is how a **should** condition in Materials is checked: the
+executor proceeded, produced the outputs, and said what was wrong with the input. A warning is
+also the executor's word, so it accompanies evidence rather than replacing it. The keys
+`outcome`, `observation`, and `warnings` are reserved for the executor's report and may appear in
+neither `expected_outputs` nor `expected_absent`; the validator rejects a test that uses them.
 
 ```yaml
 evaluation:
@@ -362,6 +387,7 @@ evaluation:
       expected_outputs:
         removed_features: [A, B]
         retained_features: [C, D, E]
+      expected_warning: orientation
     - outcome: refused_for_orientation
       expected_absent: [removed_features, retained_features, retained_matrix]
 ```
@@ -396,6 +422,9 @@ both. The executor does not read `expected_outputs` itself.
 *   In `diagnostic` mode, `result.yaml` has `outcome`, one of the accepted outcomes, and
     `observation`, one sentence saying what was found. If that outcome carries `expected_outputs`,
     their keys follow.
+*   In either mode, `result.yaml` may have `warnings`, a list of strings, one per warning the
+    executor gave because a **should** condition in Materials was not met. It is required when an
+    outcome carries `expected_warning`.
 
 `scripts/check_test_result.py <tests directory> <results directory>` compares every test that has a
 result subdirectory, or one with `--test <name>`, and is the only thing that decides pass or fail. A

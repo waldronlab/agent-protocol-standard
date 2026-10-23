@@ -12,5 +12,6 @@ evaluation:
         removed_features: [A, B]
         retained_features: [C, D]
         retained_matrix: {path: retained.csv, header: withheld}
+      expected_warning: orientation
     - outcome: refused_for_orientation
       expected_absent: [removed_features, retained_features, retained_matrix]

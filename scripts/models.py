@@ -153,8 +153,9 @@ class ProtocolFrontmatter(BaseModel):
 
 TEST_NAME_PATTERN = r"^[a-z0-9]+([-_][a-z0-9]+)*$"
 SHA256_PATTERN = r"^[0-9a-f]{64}$"
-# Keys the executor's own report uses in diagnostic mode; a test may not expect them.
-RESERVED_RESULT_KEYS = ("outcome", "observation")
+# Keys the executor's own report uses; a test may not expect them. `outcome` and `observation`
+# belong to diagnostic mode, `warnings` to either mode.
+RESERVED_RESULT_KEYS = ("outcome", "observation", "warnings")
 # Keys the checker writes into run.yaml itself; executor.yaml may not supply them.
 RESERVED_RUN_RECORD_KEYS = (
     "run_record", "protocol", "version", "repository", "protocol_commit",
@@ -306,6 +307,7 @@ class AcceptedOutcome(BaseModel):
     outcome: str
     expected_outputs: Optional[Dict[str, Any]] = None
     expected_absent: Optional[List[str]] = None
+    expected_warning: Optional[str] = None
 
     @model_validator(mode='after')
     def has_evidence(self):
@@ -313,10 +315,13 @@ class AcceptedOutcome(BaseModel):
             raise ValueError(f"outcome label must be lower-case words joined by - or _, found '{self.outcome}'")
         has_outputs = bool(self.expected_outputs)
         has_absent = bool(self.expected_absent)
+        # A warning is the executor's word, like the label; it is checked alongside evidence, not instead of it.
         if not has_outputs and not has_absent:
             raise ValueError(
                 f"outcome '{self.outcome}' needs evidence: a non-empty 'expected_outputs' or 'expected_absent'"
             )
+        if self.expected_warning is not None and not self.expected_warning.strip():
+            raise ValueError(f"outcome '{self.outcome}' 'expected_warning' must not be blank")
         if has_outputs:
             _check_no_reserved(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs")
             _check_file_refs(self.expected_outputs, f"outcome '{self.outcome}' expected_outputs", expected=True)
