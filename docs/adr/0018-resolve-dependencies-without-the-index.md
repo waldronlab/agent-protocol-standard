@@ -1,6 +1,6 @@
 # 0018. Resolve Dependencies from the Composite, Not the Index
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-23
 - **Deciders:** Levi Waldron
 
