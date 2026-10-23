@@ -2,6 +2,7 @@ import re
 import sys
 import subprocess
 import pytest
+import shutil
 import yaml
 from scripts.validate_protocol import validate_protocol, extract_frontmatter
 from pathlib import Path
@@ -138,6 +139,42 @@ Do thing.
     assert not validate_protocol(str(protocol_path), str(tmp_path / "protocols"))
     output = capsys.readouterr().out
     assert "'reviews'" in output
+
+
+def test_stale_dependency_pin_is_rejected(tmp_path, capsys):
+    """A composite's protocols_used pin must equal the local dependency's released version.
+
+    Written as a Python test rather than a fixture directory because test_invalid_fixtures
+    requires every protocol.md in a fixture to fail, and the bumped dependency here is valid.
+    """
+    src = FIXTURES_DIR / "valid" / "composite" / "protocols"
+    protocols = tmp_path / "protocols"
+    shutil.copytree(src, protocols)
+    composite = protocols / "example-composite" / "protocol.md"
+    # A dependency in another repository is never compared, whatever its pin says.
+    composite.write_text(
+        composite.read_text(encoding="utf-8").replace(
+            "protocols_used:\n",
+            "protocols_used:\n  - name: elsewhere\n    repository: example/other\n    version: 9.9.9\n",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    assert validate_protocol(str(composite), str(protocols)), capsys.readouterr().out
+    capsys.readouterr()
+    atomic = protocols / "example-atomic" / "protocol.md"
+    atomic.write_text(
+        atomic.read_text(encoding="utf-8")
+        .replace("version: 1.0.0", "version: 1.1.0", 1)
+        .replace("### Version 1.0.0 (2026-01-15)", "### Version 1.1.0 (2026-01-15)", 1),
+        encoding="utf-8",
+    )
+    assert validate_protocol(str(atomic), str(protocols)), capsys.readouterr().out
+    capsys.readouterr()
+    assert not validate_protocol(str(composite), str(protocols))
+    output = capsys.readouterr().out
+    assert "pins 'example-atomic' at version '1.0.0'" in output
+    assert "declares version '1.1.0'" in output
 
 
 @pytest.mark.parametrize("field", ["name", "description", "version", "date", "status", "protocol_citation"])

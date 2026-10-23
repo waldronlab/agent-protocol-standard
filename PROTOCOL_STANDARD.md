@@ -112,7 +112,7 @@ All fields must use `snake_case`.
 *   `protocols_used`: (Array of Objects) Sequential execution dependencies / constituent protocols (for composite workflows).
     *   `name`: (String) Name of the dependency protocol.
     *   `repository`: (String) The repository hosting the dependency.
-    *   `version`: (String) Exact version required.
+    *   `version`: (String) Exact version required. When the dependency lives in the same repository, the validator rejects a pin that does not equal the dependency's current `version`.
 *   `key_packages`: (Array of Strings) Primary R/Bioconductor, Python, or software packages used.
 *   `category`: (String) High-level domain category.
 *   `tags`: (Array of Strings) Searchable keywords.
