@@ -16,6 +16,9 @@ version with it.
 *   [`create-protocol`](create-protocol/SKILL.md): scaffolds a new protocol from the template in
     this repository, fills the frontmatter from the current schema, asks the two citation
     questions separately, walks every optional item, and validates before reporting.
+*   [`update-protocol`](update-protocol/SKILL.md): bumps a protocol's version and date, inserts
+    the matching `## History & Reviews` entry from the author's change description, and updates
+    the pin in every same-repository composite that depends on it, each with its own patch bump.
 
 ## Why these live here
 
