@@ -79,6 +79,22 @@ def test_diagnostic_requires_evidence_and_no_top_level_expectations():
             {"outcome": "r", "expected_outputs": {"n": 1}, "expected_absent": ["n"]}]}})
 
 
+def test_expected_warning_accompanies_evidence():
+    base = {"name": "diag", "description": "x", "inputs": {}}
+    # a warning alone is not evidence
+    with pytest.raises(ValidationError, match="needs evidence"):
+        ProtocolTest(**{**base, "evaluation": {"mode": "diagnostic", "accepted_outcomes": [
+            {"outcome": "warned", "expected_warning": "depth"}]}})
+    with pytest.raises(ValidationError, match="must not be blank"):
+        ProtocolTest(**{**base, "evaluation": {"mode": "diagnostic", "accepted_outcomes": [
+            {"outcome": "warned", "expected_outputs": {"n": 1}, "expected_warning": "  "}]}})
+    ProtocolTest(**{**base, "evaluation": {"mode": "diagnostic", "accepted_outcomes": [
+        {"outcome": "warned", "expected_outputs": {"n": 1}, "expected_warning": "depth"}]}})
+    # `warnings` is the executor's key in either mode
+    with pytest.raises(ValidationError, match="reserved key"):
+        ProtocolTest(**exact_case(expected_outputs={"warnings": ["x"]}))
+
+
 def test_negative_or_non_finite_tolerance_rejected():
     for bad in (-1, float("nan"), float("inf")):
         with pytest.raises(ValidationError, match="finite number >= 0"):
@@ -147,6 +163,8 @@ def passing_results(results: Path):
     (results / "basic" / "retained.csv").write_text("feature,sample_1,sample_2\nC,5,8.0\nD,10,10\n")
     write_yaml(results / "orientation" / "result.yaml", {
         "outcome": "orientation_corrected", "observation": "Transposed the input.",
+        # the orientation test's corrected outcome carries expected_warning, so this is required
+        "warnings": ["Features were in columns; the orientation was corrected before filtering."],
         "removed_features": ["A", "B"], "retained_features": ["C", "D"],
         "retained_matrix": {"path": "kept.csv"},
     })
@@ -254,6 +272,39 @@ def test_check_diagnostic_rules(repo, tmp_path, capsys):
     assert checker.main(["--test", "orientation", str(tests), str(results)]) == 1
     out = capsys.readouterr().out
     assert "not one of the accepted outcomes" in out and "observation: missing" in out
+
+
+def test_check_expected_warning(repo, tmp_path, capsys):
+    results = tmp_path / "results"
+    tests = repo / "protocols/example-protocol/tests"
+    _, out = shape(repo, results, capsys)
+    orient = next(t for t in out["tests"] if t["name"] == "orientation")
+    assert "warnings" in orient["result"]
+    assert all("expected_warning" not in o for o in orient["accepted_outcomes"])  # the phrase is withheld
+    executor(results)
+    passing_results(results)
+    corrected = yaml.safe_load((results / "orientation/result.yaml").read_text())
+    # the outputs are right but nobody was warned
+    write_yaml(results / "orientation/result.yaml", {k: v for k, v in corrected.items() if k != "warnings"})
+    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 1
+    assert "no entry contains 'orientation'" in capsys.readouterr().out
+    # a warning about something else does not count
+    write_yaml(results / "orientation/result.yaml", {**corrected, "warnings": ["Low depth in s2."]})
+    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 1
+    # the match is case-insensitive
+    write_yaml(results / "orientation/result.yaml", {**corrected, "warnings": ["ORIENTATION corrected."]})
+    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 0
+    # warnings must be a list of strings, in either mode
+    write_yaml(results / "orientation/result.yaml", {**corrected, "warnings": "orientation"})
+    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 1
+    assert "must be a list of strings" in capsys.readouterr().out
+    basic = yaml.safe_load((results / "basic/result.yaml").read_text())
+    write_yaml(results / "basic/result.yaml", {**basic, "warnings": [1]})
+    assert checker.main(["--test", "basic", str(tests), str(results)]) == 1
+    # a refusal need not warn
+    write_yaml(results / "orientation/result.yaml",
+               {"outcome": "refused_for_orientation", "observation": "Features are in columns."})
+    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 0
 
 
 def test_check_not_run_is_neither(repo, tmp_path, capsys):

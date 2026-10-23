@@ -34,6 +34,9 @@ current version, and a reviewer with and without an ORCID.
 
 ## Materials
 
+- **Input data:**
+  - `data` — a CSV table. Features should be in rows and samples in columns; if they are in
+    columns, correct the orientation and warn that the orientation was corrected, or refuse.
 - **Software & Repositories:**
   - `example-tool` (https://example.org/example-tool) — version 1.0.
 

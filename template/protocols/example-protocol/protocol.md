@@ -43,6 +43,12 @@ One or two sentences of overview: what this produces, and what it is for.
 
 ## Materials
 
+- **Input data:**
+  - `counts` — a CSV table, one row per feature and one column per sample. The first column must
+    hold unique feature identifiers; every other cell must be a non-negative number. Samples should
+    share a sequencing depth; if they do not, warn that values are not comparable across samples.
+- **Parameters:**
+  - `threshold` — the minimum proportion retained, default `0.9`; must be between 0 and 1.
 - **Software & Repositories:**
   - `tool-name` (https://example.org/tool-name) — what it is, and which version this protocol assumes.
 - **Databases & Reference Data:**

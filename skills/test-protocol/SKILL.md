@@ -1,7 +1,7 @@
 ---
 name: test-protocol
 description: Execute a protocol's tests from its tests/ directory, write results in the standard's result contract, and check them with the deterministic checker
-version: 0.1.0
+version: 0.2.0
 category: protocols
 author: waldronlab
 tags: [protocol, tests, benchmark, verification, provenance]
@@ -62,17 +62,23 @@ For each test in the shape, in any language:
 
 1. Read `protocol.md` in full. Read the test's `inputs`; a file slot `{path: ...}` is relative
    to the test's directory, which the shape names.
-2. Perform the protocol on those inputs exactly as written. Where the protocol says to record a
+2. Check every condition in `## Materials` against the inputs before Step 1. A *must* condition
+   that fails is a refusal. A *should* condition that fails is a warning: proceed, and keep the
+   warning text for `result.yaml`.
+3. Perform the protocol on those inputs exactly as written. Where the protocol says to record a
    quantity, that quantity is what a top-level key in the shape asks for.
-3. Write `<results directory>/<test name>/result.yaml`:
+4. Write `<results directory>/<test name>/result.yaml`:
    - **exact mode**: one key per top-level key in the shape. A file slot is written as
      `{path: <file name>}` and the file goes in the same subdirectory as a CSV with the header
      the shape gave, or the header the protocol prescribes when the shape says `withheld`.
    - **diagnostic mode**: `outcome`, one of the accepted labels; `observation`, one sentence
      saying what you found; and whatever keys that outcome expects present. If you refused
-     because the input violates a requirement the protocol states, say so in `observation` and
-     write nothing the protocol would have produced.
-4. Record more than the shape asks for if it helps a reader; extra top-level keys are ignored.
+     because the input violates a *must* condition, say so in `observation` and write nothing
+     the protocol would have produced.
+   - **either mode**: `warnings`, a list of strings, when a *should* condition was not met. Each
+     entry names the condition and the consequence the protocol gives for it. Omit the key when
+     there was nothing to warn about.
+5. Record more than the shape asks for if it helps a reader; extra top-level keys are ignored.
    Inside a nested mapping, record exactly the entries the protocol produces; an extra entry is a
    wrong answer.
 
@@ -93,7 +99,7 @@ executor:
   language: R
   invocation:
     kind: skill
-    skill: test-protocol 0.1.0
+    skill: test-protocol 0.2.0
   prompt: |
     Run the tests for independent-filtering-variance.
 ```
@@ -129,7 +135,7 @@ during the run. Start again from step 2 in a fresh results directory.
    out afterwards.
 6. A closing line naming this skill and its version:
 
-   > 🛠️ Skill executed: `test-protocol` v`0.1.0` (`waldronlab/agent-protocol-standard`)
+   > 🛠️ Skill executed: `test-protocol` v`0.2.0` (`waldronlab/agent-protocol-standard`)
 
 ## Notes
 

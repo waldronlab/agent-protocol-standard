@@ -35,7 +35,7 @@ from validate_protocol import load_test_case, extract_frontmatter  # noqa: E402
 from repo_utils import parse_repository_url  # noqa: E402
 
 CHECKER_NAME = "check_test_result.py"
-CHECKER_VERSION = "0.1.0"
+CHECKER_VERSION = "0.2.0"
 RUN_RECORD_VERSION = 1
 SOURCE_FILE = "source.yaml"
 EXECUTOR_FILE = "executor.yaml"
@@ -233,7 +233,8 @@ def shape_of(case: ProtocolTest, test_dir: Path, results_dir: Path) -> dict:
             if o.expected_absent:
                 entry["expected_absent"] = list(o.expected_absent)
             outcomes.append(entry)
-        shape["result"] = {"outcome": "one of the labels below", "observation": "string"}
+        shape["result"] = {"outcome": "one of the labels below", "observation": "string",
+                           "warnings": "list of strings, when the protocol said to warn"}
         shape["accepted_outcomes"] = outcomes
     return shape
 
@@ -454,10 +455,12 @@ def check_one(case: ProtocolTest, test_dir: Path, result_dir: Path, results_dir:
         return entry
 
     tol = case.evaluation.numeric_tolerance
+    warnings = result.get("warnings")
+    warnings_ok = warnings is None or (isinstance(warnings, list) and all(isinstance(w, str) for w in warnings))
+    failures = [] if warnings_ok else ["warnings: must be a list of strings"]
     if case.evaluation.mode == "exact":
-        failures = compare_top(case.expected_outputs, result, tol, test_dir, result_dir, results_dir)
+        failures += compare_top(case.expected_outputs, result, tol, test_dir, result_dir, results_dir)
     else:
-        failures = []
         label = result.get("outcome")
         outcome = case.outcome(label) if isinstance(label, str) else None
         if outcome is None:
@@ -472,6 +475,12 @@ def check_one(case: ProtocolTest, test_dir: Path, result_dir: Path, results_dir:
             for k in outcome.expected_absent or []:
                 if k in result:
                     failures.append(f"{k}: present in result.yaml, but outcome '{label}' requires it absent")
+            if outcome.expected_warning:
+                needle = outcome.expected_warning.casefold()
+                if not warnings_ok or not any(needle in w.casefold() for w in warnings or []):
+                    failures.append(
+                        f"warnings: no entry contains {outcome.expected_warning!r}, which outcome '{label}' requires"
+                    )
     entry["result"] = "pass" if not failures else "fail"
     if failures:
         entry["failures"] = failures
