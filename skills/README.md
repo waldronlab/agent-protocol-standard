@@ -13,6 +13,9 @@ version with it.
     protocol, fixes the errors that have one correct answer (a misnamed heading, a `date` that
     disagrees with the top History entry, a retired field name), and states the judgement calls
     that remain, such as which publication `protocol_citation` names, without guessing.
+*   [`create-protocol`](create-protocol/SKILL.md): scaffolds a new protocol from the template in
+    this repository, fills the frontmatter from the current schema, asks the two citation
+    questions separately, walks every optional item, and validates before reporting.
 
 ## Why these live here
 
