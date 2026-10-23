@@ -1,0 +1,5 @@
+name: reserved
+description: Expects the executor's own report key.
+inputs: {theta: 0.5}
+expected_outputs: {outcome: success}
+evaluation: {mode: exact}

@@ -9,7 +9,75 @@ from datetime import datetime
 # Make sure scripts directory is in path
 sys.path.insert(0, str(Path(__file__).parent))
 from models import ProtocolFrontmatter, check_renamed_fields, SEMVER_PATTERN, ORCID_PATTERN
+from models import ProtocolTest, walk_section_file_refs, FileRef
 from repo_utils import detect_repository
+
+
+def load_test_case(test_dir):
+    """Parse and validate one tests/<name>/ directory. Returns (ProtocolTest or None, [errors])."""
+    test_dir = Path(test_dir)
+    label = f"tests/{test_dir.name}"
+    test_yaml = test_dir / "test.yaml"
+    if not test_yaml.is_file():
+        return None, [f"{label}: no test.yaml; every directory under tests/ is a test"]
+    try:
+        raw = yaml.safe_load(test_yaml.read_text(encoding='utf-8'))
+    except Exception as e:
+        return None, [f"{label}/test.yaml: failed to parse YAML: {e}"]
+    if not isinstance(raw, dict):
+        return None, [f"{label}/test.yaml: document is not a mapping"]
+    try:
+        case = ProtocolTest(**raw)
+    except Exception as e:
+        errors = []
+        try:
+            for err in e.errors():
+                loc = ".".join(str(l) for l in err["loc"])
+                msg = err["msg"].replace("Value error, ", "")
+                if err["type"] == "missing":
+                    errors.append(f"{label}/test.yaml: missing required field '{loc}'")
+                else:
+                    errors.append(f"{label}/test.yaml: {loc + ': ' if loc else ''}{msg}")
+        except Exception:
+            errors.append(f"{label}/test.yaml: {e}")
+        return None, errors
+    errors = []
+    if case.name != test_dir.name:
+        errors.append(f"{label}/test.yaml: 'name' is '{case.name}' but the directory is '{test_dir.name}'")
+    for section in (case.inputs, case.expected_outputs or {}):
+        for key, raw_ref in walk_section_file_refs(section):
+            ref = FileRef(**raw_ref)
+            if ref.path is not None and not (test_dir / ref.path).is_file():
+                errors.append(f"{label}/test.yaml: {key} names '{ref.path}', which does not exist in {label}/")
+    for outcome in case.evaluation.accepted_outcomes or []:
+        for key, raw_ref in walk_section_file_refs(outcome.expected_outputs or {}):
+            ref = FileRef(**raw_ref)
+            if ref.path is not None and not (test_dir / ref.path).is_file():
+                errors.append(f"{label}/test.yaml: outcome '{outcome.outcome}' {key} names '{ref.path}', which does not exist in {label}/")
+    return (case if not errors else None), errors
+
+
+def validate_tests_dir(protocol_dir):
+    """Validate protocols/<name>/tests/ if present. Returns (number of tests, [errors])."""
+    tests_dir = Path(protocol_dir) / "tests"
+    if not tests_dir.exists():
+        return 0, []
+    if not tests_dir.is_dir():
+        return 0, ["'tests' exists but is not a directory"]
+    errors = []
+    count = 0
+    for entry in sorted(tests_dir.iterdir()):
+        if entry.name.startswith('.'):
+            continue
+        if not entry.is_dir():
+            errors.append(f"tests/{entry.name}: only test directories belong directly under tests/")
+            continue
+        _, errs = load_test_case(entry)
+        errors.extend(errs)
+        count += 1
+    if count == 0 and not errors:
+        errors.append("tests/ exists but contains no tests; remove it or add a test")
+    return count, errors
 
 def strip_frontmatter_and_code(lines):
     keep = [True] * len(lines)
@@ -371,8 +439,14 @@ def validate_protocol(file_path, protocols_dir, this_repository=None):
                 if not os.path.exists(dep_path):
                     errors.append(f"Dependent protocol '{dep.name}' not found at '{dep_path}'")
 
+    n_tests, test_errors = validate_tests_dir(os.path.dirname(file_path))
+    errors.extend(test_errors)
+
     for msg in errors:
         print(f"  [ERROR] {msg} in '{display_name}'")
+
+    if n_tests and not test_errors:
+        print(f"  [INFO] {n_tests} test{'s' if n_tests != 1 else ''} under tests/ conform to the schema.")
         
     fm_reviews = fm_model.reviews if fm_model else []
         

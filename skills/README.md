@@ -6,6 +6,9 @@ version with it.
 *   [`protocol-runner`](protocol-runner/SKILL.md) — discovers protocols across the federation,
     ranks them by trust and status, resolves dependencies, emits a two-level provenance block before
     executing anything, and drafts a Methods section afterwards.
+*   [`test-protocol`](test-protocol/SKILL.md) — runs the tests a protocol carries under `tests/`,
+    writes results in the standard's result contract, and hands them to
+    `scripts/check_test_result.py`, which decides pass or fail and writes the run record.
 
 ## Why these live here
 

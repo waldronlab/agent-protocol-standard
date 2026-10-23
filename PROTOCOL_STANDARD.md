@@ -279,10 +279,6 @@ These rules are enforced by `scripts/validate_protocol.py`, which runs on every 
 
 ## Tests
 
-*Proposed in ADR 0016. The validator, the checker, and the `test-protocol` skill described here
-are not yet implemented; until they are, CI does not check `tests/` and the commands below do not
-exist. This notice is removed when they do.*
-
 A protocol may carry tests: known inputs with the outputs a correct execution produces. Tests are
 optional. When present they live beside the protocol, one directory per test:
 
@@ -330,8 +326,9 @@ evaluation:
     to every numeric comparison, default `0`.
 
 A **file** is a mapping with exactly one of two shapes: `{path: <relative path>}`, inside the test
-directory with no `..`, or `{url: <https URL>, sha256: <hex digest>}`. Any other string is a
-literal value, so `data: input.csv` is the string `input.csv`, not a file. The remote form is for
+directory with no `..`, or `{url: <https URL>, sha256: <hex digest>}`. A file is always a direct
+value of `inputs` or `expected_outputs`; a file inside a nested mapping or list is rejected. Any
+other string is a literal value, so `data: input.csv` is the string `input.csv`, not a file. The remote form is for
 data too large to commit; the digest is verified after download and a mismatch fails the test. Keep
 local files small. A table slot in `expected_outputs` may add `header: withheld` when the column
 set is itself part of the answer, as in a test that selects columns; the executor then names the
@@ -381,8 +378,9 @@ quantities the protocol says to record and are fixed by it. The keys of any nest
 data, such as feature identifiers, and are withheld: the shape shows a nested mapping as
 `{<key>: <type>}`, because its membership can itself be the answer. Data rows and scalar values
 are never included. `scripts/check_test_result.py --shape <tests directory> <results directory>`
-prints the shape of every test, or of one with `--test <name>`, and writes `source.yaml` into the
-results directory: the commit the checkout is at, whether the protocol directory has uncommitted
+prints the shape of every test, or of one with `--test <name>`. A remote input is downloaded
+then, verified against its digest, and handed to the executor as a local path, so nothing runs on
+unverified bytes. The command also writes `source.yaml` into the results directory: the commit the checkout is at, whether the protocol directory has uncommitted
 changes, and a digest of `protocol.md` and the tests directory. That is the snapshot the run is
 attributed to. It is taken before execution because the checkout can move afterwards.
 
@@ -448,7 +446,7 @@ executor:
 checker: check_test_result.py 0.1.0
 tests:
   - name: variance_rows
-    result: pass                # pass | fail
+    result: pass                # pass | fail | not_run (no result subdirectory)
   - name: mean_columns
     result: pass
     outcome: orientation_corrected   # diagnostic mode only
@@ -483,9 +481,10 @@ attached, with the failing comparisons. Which of the executor, its environment, 
 the test is at fault is found out, not assumed: an agent can execute a correct protocol wrongly,
 and measuring how often is what the tests are for.
 
-CI validates each `test.yaml` against this schema and checks that local files exist. It does not
-fetch remote files or execute tests. The `test-protocol` skill in this repository implements the
-result contract for an agent.
+CI validates each `test.yaml` against this schema and checks that local files exist, through the
+same `scripts/validate_protocol.py` that validates `protocol.md`. It does not fetch remote files or
+execute tests. The `test-protocol` skill in this repository implements the result contract for an
+agent.
 
 ## Example Protocol
 

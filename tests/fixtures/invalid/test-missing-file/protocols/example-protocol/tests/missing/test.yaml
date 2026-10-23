@@ -1,0 +1,6 @@
+name: missing
+description: Names a local file that is not there.
+inputs:
+  data: {path: input.csv}
+expected_outputs: {n: 1}
+evaluation: {mode: exact}

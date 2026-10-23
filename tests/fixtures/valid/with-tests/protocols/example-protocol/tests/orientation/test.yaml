@@ -1,0 +1,16 @@
+name: orientation
+description: Features in columns; the executor corrects the orientation or refuses.
+inputs:
+  data: {path: input.csv}
+  filter: mean
+  theta: 0.5
+evaluation:
+  mode: diagnostic
+  accepted_outcomes:
+    - outcome: orientation_corrected
+      expected_outputs:
+        removed_features: [A, B]
+        retained_features: [C, D]
+        retained_matrix: {path: retained.csv, header: withheld}
+    - outcome: refused_for_orientation
+      expected_absent: [removed_features, retained_features, retained_matrix]

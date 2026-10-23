@@ -1,0 +1,5 @@
+name: empty
+description: Exact mode with nothing to check.
+inputs: {theta: 0.5}
+expected_outputs: {}
+evaluation: {mode: exact}

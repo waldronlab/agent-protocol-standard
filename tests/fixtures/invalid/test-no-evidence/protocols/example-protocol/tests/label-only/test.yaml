@@ -1,0 +1,7 @@
+name: label-only
+description: A diagnostic outcome with no evidence.
+inputs: {theta: 0.5}
+evaluation:
+  mode: diagnostic
+  accepted_outcomes:
+    - outcome: refused

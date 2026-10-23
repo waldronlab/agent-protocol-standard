@@ -1,6 +1,6 @@
 # 0016. Protocol Tests: Fixtures, a Result Contract, and a Review Status
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-18
 - **Deciders:** Levi Waldron (User), AI Agent
 

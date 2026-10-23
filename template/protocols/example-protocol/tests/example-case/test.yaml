@@ -1,0 +1,13 @@
+# One test: known inputs, and the outputs a correct execution of protocol.md produces.
+# The directory name must match `name`. See the "Tests" section of PROTOCOL_STANDARD.md.
+name: example-case
+description: One sentence saying what this test exercises.
+inputs:                            # everything the executor is given
+  data: {path: input.csv}          # a file: {path: ...} here, or {url: ..., sha256: ...}
+  threshold: 0.9                   # the protocol's own parameter names
+expected_outputs:                  # what a correct execution produces; values are withheld from the executor
+  n_retained: 2
+  retained: {path: expected.csv}   # a CSV table, compared row by row
+evaluation:
+  mode: exact                      # exact | diagnostic
+  numeric_tolerance: 0

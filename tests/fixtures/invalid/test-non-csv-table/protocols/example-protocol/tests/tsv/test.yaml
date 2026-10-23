@@ -1,0 +1,6 @@
+name: tsv
+description: An expected output file that is not CSV.
+inputs: {theta: 0.5}
+expected_outputs:
+  table: {path: out.tsv}
+evaluation: {mode: exact}

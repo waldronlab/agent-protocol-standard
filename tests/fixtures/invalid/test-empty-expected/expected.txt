@@ -1,0 +1,1 @@
+a test that checks nothing is invalid
