@@ -1,16 +1,18 @@
 ---
 # Replace every value below. The directory name must match `name` exactly.
+# Every optional item carries a marker comment saying so. Fill the item in or delete it, and
+# remove the marker either way, so that no marker survives in a finished protocol.
 name: example-protocol
 description: One sentence saying what this protocol does.
 version: 1.0.0
 authors:
   - name: Your Name
-    orcid: 0000-0000-0000-0000   # optional; delete the line if you do not have one
+    orcid: 0000-0000-0000-0000   # Optional, delete if unneeded. Validated when present.
 date: 2026-09-11
 status: draft                     # draft | stable | deprecated | superseded
 
-license: CC-BY-4.0
-type: atomic                      # atomic | composite
+license: CC-BY-4.0                # Optional, delete if unneeded.
+type: atomic                      # Optional, delete if unneeded. atomic | composite
 
 # REQUIRED. Who published THESE INSTRUCTIONS? Name the publication that describes this procedure as
 # written here, parameters included. Where no publication describes it — you are writing the first
@@ -18,23 +20,24 @@ type: atomic                      # atomic | composite
 # `collection_doi`. Repeating `collection_doi` here is how a protocol says "published here, by us".
 protocol_citation: "10.0000/replace-with-a-real-doi"
 
-# OPTIONAL. Who invented the method? Uncomment and name the primary literature where it was FIRST
-# PROPOSED — not a paper that applies an already-established method. Leave it out entirely if the
-# protocol originates no method: documenting how to operate a tool is not a method someone proposed.
+# Optional, delete if unneeded. Who invented the method? Uncomment and name the primary literature
+# where it was FIRST PROPOSED, not a paper that applies an already-established method. Leave it
+# out entirely if the protocol originates no method: documenting how to operate a tool is not a
+# method someone proposed. Never set it to null.
 # method_origin_citation: "10.1000/xyz"
 
-# DOIs identifying this document and the collection housing it, if they exist. Delete if not.
-artifact_doi: ~
-collection_doi: ~
+# DOIs identifying this document and the collection housing it, if they exist.
+artifact_doi: ~                   # Optional, delete if unneeded.
+collection_doi: ~                 # Optional, delete if unneeded.
 
 # Where an agent can find the tools and reference data this protocol needs.
-upstream_repositories: []
-database_urls: []
+upstream_repositories: []         # Optional, delete if unneeded.
+database_urls: []                 # Optional, delete if unneeded.
 
-protocols_used: []                # composite protocols list their constituents here
-key_packages: []
-category: example
-tags: [example]
+protocols_used: []                # Optional, delete if unneeded. Composites list constituents here.
+key_packages: []                  # Optional, delete if unneeded.
+category: example                 # Optional, delete if unneeded.
+tags: [example]                   # Optional, delete if unneeded.
 ---
 
 # Example Protocol
@@ -71,6 +74,7 @@ Say *why* a parameter has the value it has whenever the reason is not obvious. T
 reader cannot reconstruct from the code.
 
 ## Notes
+<!-- Optional, delete if unneeded. -->
 
 Caveats, computational and HPC requirements, and troubleshooting. Anything a Methods section would
 omit but someone reproducing the work would need.
