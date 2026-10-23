@@ -9,6 +9,10 @@ version with it.
 *   [`test-protocol`](test-protocol/SKILL.md) — runs the tests a protocol carries under `tests/`,
     writes results in the standard's result contract, and hands them to
     `scripts/check_test_result.py`, which decides pass or fail and writes the run record.
+*   [`validate-protocol`](validate-protocol/SKILL.md): runs `scripts/validate_protocol.py` on a
+    protocol, fixes the errors that have one correct answer (a misnamed heading, a `date` that
+    disagrees with the top History entry, a retired field name), and states the judgement calls
+    that remain, such as which publication `protocol_citation` names, without guessing.
 
 ## Why these live here
 
