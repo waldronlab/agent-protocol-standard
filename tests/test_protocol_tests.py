@@ -822,3 +822,21 @@ def test_bundle_copies_a_verified_remote_input(repo, tmp_path, capsys, monkeypat
     assert rc == 0
     assert out["tests"][0]["inputs"]["data"] == {"path": "remote.csv"}
     assert (bundle / "inputs/basic/remote.csv").read_bytes() == data
+
+
+@pytest.mark.parametrize("inputs, message", [
+    ({"data": {"path": "input.csv"}, "again": {"url": "https://example.org/x/input.csv", "sha256": "a" * 64}},
+     "would both be input.csv"),
+    ({"data": {"url": "https://example.org/x/..", "sha256": "a" * 64}}, "cannot be named '..'"),
+    ({"data": {"url": "https://example.org/x/", "sha256": "a" * 64}}, "cannot be named ''"),
+])
+def test_bundle_refuses_input_paths_before_anything_is_created(repo, tmp_path, capsys, inputs, message):
+    test_yaml = repo / "protocols/example-protocol/tests/basic/test.yaml"
+    t = yaml.safe_load(test_yaml.read_text())
+    t["inputs"].update(inputs)
+    test_yaml.write_text(yaml.safe_dump(t))
+    tests = str(repo / "protocols/example-protocol/tests")
+    assert checker.main(["--shape", tests, str(tmp_path / "results"), "--bundle", str(tmp_path / "bundle"),
+                         "--test", "basic"]) == 2
+    assert message in capsys.readouterr().err
+    assert not (tmp_path / "results").exists() and not (tmp_path / "bundle").exists()

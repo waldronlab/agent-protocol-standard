@@ -314,8 +314,31 @@ def bundle_dependencies(protocol_dir: Path, fm: dict) -> list:
     return [path for path, _ in found.values()]
 
 
+def bundle_input_paths(cases: list) -> dict:
+    """Where each test's file inputs go in the bundle, relative to the test's directory there:
+    {test name: {input key: path}}. Checked before anything is created. The schema already keeps
+    a local path inside the test directory; a remote file is named by its URL's last segment."""
+    paths = {}
+    for _, case in cases:
+        taken, rels = {}, {}
+        for k, v in case.inputs.items():
+            if not is_file_mapping(v):
+                continue
+            ref = FileRef(**v)
+            rel = ref.path if ref.path is not None else ref.name
+            parts = Path(rel).parts
+            if not parts or Path(rel).is_absolute() or any(x in (".", "..") for x in parts):
+                raise ContractError(f"test '{case.name}' input '{k}' cannot be named '{rel}' in the bundle")
+            if rel in taken:
+                raise ContractError(f"test '{case.name}' inputs '{taken[rel]}' and '{k}' would both be {rel} in the bundle")
+            taken[rel] = k
+            rels[k] = rel
+        paths[case.name] = rels
+    return paths
+
+
 def write_bundle(bundle_dir: Path, protocol_dir: Path, fm: dict, cases: list, results_dir: Path,
-                 dependencies: list) -> dict:
+                 dependencies: list, input_paths: dict) -> dict:
     """Copy what the executor may see into bundle_dir and return the shape, with input paths
     relative to each test's directory in the bundle."""
     bundle_dir = bundle_dir.resolve()  # the executor is handed these paths from anywhere
@@ -336,10 +359,10 @@ def write_bundle(bundle_dir: Path, protocol_dir: Path, fm: dict, cases: list, re
                 continue
             ref = FileRef(**v)
             # Only the files the inputs name; a remote one is the copy --shape already verified.
-            rel = ref.path if ref.path is not None else ref.name
+            rel = input_paths[case.name][k]
             target = dest / rel
-            if target.exists():
-                raise ContractError(f"test '{case.name}' names two inputs that would both be {rel} in the bundle")
+            if not _inside(target, dest):  # bundle_input_paths ruled this out; never write outside
+                raise ContractError(f"test '{case.name}' input '{k}' would be written outside {dest}")
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(resolve_expected_file(test_dir, results_dir, ref), target)
             inputs[k] = {"path": rel}
@@ -687,8 +710,13 @@ def cmd_shape(tests_dir: Path, results_dir: Path, only: str = None, bundle_dir: 
     protocol_dir = tests_dir.parent
     fm = load_frontmatter(protocol_dir)
     cases = load_tests(tests_dir, only)
-    # Resolved before anything is created, so a refused dependency leaves nothing behind.
-    dependencies = bundle_dependencies(protocol_dir, fm) if bundle_dir is not None else None
+    # Resolved before anything is created, so a refused dependency or input leaves nothing behind.
+    # A remote input that fails to download is still refused afterwards: its cache is the results
+    # directory, as without a bundle.
+    dependencies = input_paths = None
+    if bundle_dir is not None:
+        dependencies = bundle_dependencies(protocol_dir, fm)
+        input_paths = bundle_input_paths(cases)
     check_dirs_for_shape(protocol_dir, results_dir, bundle_dir)
     snapshot = source_snapshot(protocol_dir)
     snapshot["protocol"] = fm.get("name")
@@ -697,7 +725,7 @@ def cmd_shape(tests_dir: Path, results_dir: Path, only: str = None, bundle_dir: 
         snapshot["bundle"] = str(bundle_dir.resolve())
     (results_dir / SOURCE_FILE).write_text(yaml.safe_dump(snapshot, sort_keys=False), encoding="utf-8")
     if bundle_dir is not None:
-        out = write_bundle(bundle_dir, protocol_dir, fm, cases, results_dir, dependencies)
+        out = write_bundle(bundle_dir, protocol_dir, fm, cases, results_dir, dependencies, input_paths)
     else:
         out = {
             "protocol": fm.get("name"),
