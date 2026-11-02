@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Check an execution of a protocol's tests against their expectations.
 
-    check_test_result.py --shape TESTS_DIR RESULTS_DIR [--test NAME]
+    check_test_result.py --shape TESTS_DIR RESULTS_DIR [--test NAME] [--bundle BUNDLE_DIR]
         Print the result shape of every test (values withheld) and write
-        RESULTS_DIR/source.yaml, the snapshot the run is attributed to.
+        RESULTS_DIR/source.yaml, the snapshot the run is attributed to. With
+        --bundle, also write everything the executor may see into BUNDLE_DIR:
+        protocol.md, the protocols it uses, each test's inputs, and the shape.
+        The executor then writes its results into BUNDLE_DIR/results.
 
     check_test_result.py TESTS_DIR RESULTS_DIR [--test NAME]
-        Compare RESULTS_DIR/<test>/result.yaml against each test, write
+        Compare each test's result.yaml against the test, write
         RESULTS_DIR/run.yaml, and exit 0 if every compared test passed, 1 if
-        any failed, 2 if the contract was not met.
+        any failed, 2 if the contract was not met. A run is checked once:
+        a results directory that already holds run.yaml is refused.
 
 The contract is the "Tests" section of PROTOCOL_STANDARD.md. This script is
 the only thing that decides pass or fail.
@@ -17,6 +21,7 @@ import sys
 import os
 import csv
 import hashlib
+import shutil
 from decimal import Decimal, InvalidOperation
 from fractions import Fraction
 import subprocess
@@ -35,13 +40,18 @@ from validate_protocol import load_test_case, extract_frontmatter  # noqa: E402
 from repo_utils import parse_repository_url  # noqa: E402
 
 CHECKER_NAME = "check_test_result.py"
-CHECKER_VERSION = "0.2.0"
+CHECKER_VERSION = "0.3.0"
 RUN_RECORD_VERSION = 1
 SOURCE_FILE = "source.yaml"
 EXECUTOR_FILE = "executor.yaml"
 RUN_FILE = "run.yaml"
 RESULT_FILE = "result.yaml"
 CACHE_DIR = ".remote"
+# Inside a bundle
+SHAPE_FILE = "shape.yaml"
+BUNDLE_INPUTS = "inputs"
+BUNDLE_PROTOCOLS = "protocols"
+BUNDLE_RESULTS = "results"
 
 
 class ContractError(Exception):
@@ -239,18 +249,113 @@ def shape_of(case: ProtocolTest, test_dir: Path, results_dir: Path) -> dict:
     return shape
 
 
-def check_results_dir_for_shape(protocol_dir: Path, results_dir: Path):
-    inside = False
+def _inside(path: Path, root: Path) -> bool:
     try:
-        results_dir.resolve().relative_to(protocol_dir.resolve())
-        inside = True
+        path.resolve().relative_to(root.resolve())
+        return True
     except ValueError:
-        pass
-    if inside:  # checked before anything is created, so a refusal leaves nothing behind
+        return False
+
+
+def check_dirs_for_shape(protocol_dir: Path, results_dir: Path, bundle_dir: Path = None):
+    # Everything is checked before anything is created, so a refusal leaves nothing behind.
+    if _inside(results_dir, protocol_dir):
         raise ContractError(f"results directory {results_dir} lies inside the protocol directory; put it elsewhere")
-    results_dir.mkdir(parents=True, exist_ok=True)
-    if any(results_dir.iterdir()):
-        raise ContractError(f"results directory {results_dir} is not empty; use a new directory for each run")
+    dirs = [("results", results_dir)]
+    if bundle_dir is not None:
+        checkout = Path(_git(protocol_dir, "rev-parse", "--show-toplevel") or protocol_dir.parent)
+        if _inside(bundle_dir, checkout):
+            raise ContractError(f"bundle directory {bundle_dir} lies inside the checkout {checkout}, "
+                                "where the executor could reach the tests; put it elsewhere")
+        if _inside(bundle_dir, results_dir) or _inside(results_dir, bundle_dir):
+            # The results directory caches remote expected files, so the executor never sees it.
+            raise ContractError(f"bundle directory {bundle_dir} and results directory {results_dir} "
+                                "must not contain one another")
+        dirs.append(("bundle", bundle_dir))
+    for what, d in dirs:
+        if d.is_dir() and any(d.iterdir()):
+            raise ContractError(f"{what} directory {d} is not empty; use a new directory for each run")
+    for _, d in dirs:
+        d.mkdir(parents=True, exist_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Bundle: everything the executor may see, and nothing else
+# ---------------------------------------------------------------------------
+
+def bundle_dependencies(protocol_dir: Path, fm: dict) -> list:
+    """protocol.md of every protocol this one uses, transitively, found in the checkout by file
+    presence at the pinned version. Resolving a dependency from another repository is #55; until
+    then one that is not in the checkout cannot be bundled."""
+    protocols_dir = protocol_dir.parent
+    found = {}
+    queue = [(fm.get("name"), fm)]
+    while queue:
+        user, user_fm = queue.pop()
+        for dep in user_fm.get("protocols_used") or []:
+            name = dep.get("name") if isinstance(dep, dict) else None
+            if not isinstance(name, str) or Path(name).name != name or name in (".", ".."):
+                raise ContractError(f"'{user}' has a protocols_used entry without a usable name: {dep!r}")
+            version = str(dep.get("version"))
+            if name in found:
+                if found[name][1] != version:
+                    raise ContractError(f"'{name}' is pinned at both {found[name][1]} and {version}; "
+                                        "a bundle holds one version of each protocol")
+                continue
+            path = protocols_dir / name / "protocol.md"
+            if not path.is_file():
+                raise ContractError(f"'{user}' uses '{name}', which is not in this checkout at {path}; "
+                                    "bundling a dependency from another repository waits on #55")
+            dep_fm = load_frontmatter(path.parent)
+            if str(dep_fm.get("version")) != version:
+                raise ContractError(f"'{user}' pins '{name}' at {version}, but {path} is version {dep_fm.get('version')}")
+            found[name] = (path, version)
+            queue.append((name, dep_fm))
+    return [path for path, _ in found.values()]
+
+
+def write_bundle(bundle_dir: Path, protocol_dir: Path, fm: dict, cases: list, results_dir: Path,
+                 dependencies: list) -> dict:
+    """Copy what the executor may see into bundle_dir and return the shape, with input paths
+    relative to each test's directory in the bundle."""
+    bundle_dir = bundle_dir.resolve()  # the executor is handed these paths from anywhere
+    shutil.copyfile(protocol_dir / "protocol.md", bundle_dir / "protocol.md")
+    for path in dependencies:
+        target = bundle_dir / BUNDLE_PROTOCOLS / path.parent.name / "protocol.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
+    shapes = []
+    for test_dir, case in cases:
+        dest = bundle_dir / BUNDLE_INPUTS / case.name
+        dest.mkdir(parents=True)
+        shape = shape_of(case, test_dir, results_dir)
+        inputs = {}
+        for k, v in case.inputs.items():
+            if not is_file_mapping(v):
+                inputs[k] = v
+                continue
+            ref = FileRef(**v)
+            # Only the files the inputs name; a remote one is the copy --shape already verified.
+            rel = ref.path if ref.path is not None else ref.name
+            target = dest / rel
+            if target.exists():
+                raise ContractError(f"test '{case.name}' names two inputs that would both be {rel} in the bundle")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(resolve_expected_file(test_dir, results_dir, ref), target)
+            inputs[k] = {"path": rel}
+        shape["test_directory"] = str(dest)
+        shape["inputs"] = inputs
+        shapes.append(shape)
+    (bundle_dir / BUNDLE_RESULTS).mkdir()
+    out = {
+        "protocol": fm.get("name"),
+        "version": str(fm.get("version")),
+        "results_directory": str(bundle_dir / BUNDLE_RESULTS),
+        "tests": shapes,
+    }
+    (bundle_dir / SHAPE_FILE).write_text(yaml.safe_dump(out, sort_keys=False, allow_unicode=True),
+                                         encoding="utf-8")
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -533,7 +638,25 @@ def _stamp(v) -> str:
     return _parse_timestamp(v).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def build_run_record(fm: dict, source: dict, executor: dict, tests: list) -> dict:
+def check_timestamps(executor: dict, source: dict, checked: datetime):
+    """The executor's times must fit between the checker's own: --shape before execution
+    finished, and execution finished before now. Compared to the second, as they are recorded."""
+    shaped = _parse_timestamp(source.get("taken"))
+    if shaped is None:
+        raise ContractError(f"{SOURCE_FILE} has no 'taken' timestamp; re-run from --shape")
+    second = lambda dt: dt.astimezone(timezone.utc).replace(microsecond=0)  # noqa: E731
+    started, finished = (second(_parse_timestamp(executor[k])) for k in ("started", "finished"))
+    if started > finished:
+        raise ContractError(f"{EXECUTOR_FILE}: 'started' {_stamp(started)} is after 'finished' {_stamp(finished)}")
+    if finished < second(shaped):
+        raise ContractError(f"{EXECUTOR_FILE}: 'finished' {_stamp(finished)} is before --shape took the snapshot "
+                            f"at {_stamp(shaped)}; execution follows --shape")
+    if finished > second(checked):
+        raise ContractError(f"{EXECUTOR_FILE}: 'finished' {_stamp(finished)} is later than now, {_stamp(checked)}; "
+                            "take timestamps from the clock, never write them by hand")
+
+
+def build_run_record(fm: dict, source: dict, executor: dict, tests: list, checked: datetime) -> dict:
     record = {
         "run_record": RUN_RECORD_VERSION,
         "protocol": fm.get("name"),
@@ -544,6 +667,8 @@ def build_run_record(fm: dict, source: dict, executor: dict, tests: list) -> dic
         "source_digest": source.get("source_digest"),
         "started": _stamp(executor["started"]),
         "finished": _stamp(executor["finished"]),
+        "shaped": _stamp(source["taken"]),
+        "checked": _stamp(checked),
         "executor": executor["executor"],
     }
     for k, v in executor.items():
@@ -558,21 +683,28 @@ def build_run_record(fm: dict, source: dict, executor: dict, tests: list) -> dic
 # Commands
 # ---------------------------------------------------------------------------
 
-def cmd_shape(tests_dir: Path, results_dir: Path, only: str = None) -> int:
+def cmd_shape(tests_dir: Path, results_dir: Path, only: str = None, bundle_dir: Path = None) -> int:
     protocol_dir = tests_dir.parent
     fm = load_frontmatter(protocol_dir)
     cases = load_tests(tests_dir, only)
-    check_results_dir_for_shape(protocol_dir, results_dir)
+    # Resolved before anything is created, so a refused dependency leaves nothing behind.
+    dependencies = bundle_dependencies(protocol_dir, fm) if bundle_dir is not None else None
+    check_dirs_for_shape(protocol_dir, results_dir, bundle_dir)
     snapshot = source_snapshot(protocol_dir)
     snapshot["protocol"] = fm.get("name")
     snapshot["taken"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if bundle_dir is not None:
+        snapshot["bundle"] = str(bundle_dir.resolve())
     (results_dir / SOURCE_FILE).write_text(yaml.safe_dump(snapshot, sort_keys=False), encoding="utf-8")
-    out = {
-        "protocol": fm.get("name"),
-        "version": str(fm.get("version")),
-        "results_directory": str(results_dir),
-        "tests": [shape_of(case, test_dir, results_dir) for test_dir, case in cases],
-    }
+    if bundle_dir is not None:
+        out = write_bundle(bundle_dir, protocol_dir, fm, cases, results_dir, dependencies)
+    else:
+        out = {
+            "protocol": fm.get("name"),
+            "version": str(fm.get("version")),
+            "results_directory": str(results_dir),
+            "tests": [shape_of(case, test_dir, results_dir) for test_dir, case in cases],
+        }
     sys.stdout.write(yaml.safe_dump(out, sort_keys=False, allow_unicode=True))
     return 0
 
@@ -583,6 +715,11 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
     cases = load_tests(tests_dir, only)
     if not results_dir.is_dir():
         raise ContractError(f"results directory {results_dir} does not exist")
+    if (results_dir / RUN_FILE).exists() or (results_dir / RUN_FILE).is_symlink():
+        # A second check after reading the first one's failures would not be blind.
+        raise ContractError(f"{results_dir / RUN_FILE} exists: this run was already checked, and a run is "
+                            "checked once. Report it as it stands; another attempt starts from --shape "
+                            "in a new results directory")
     source_path = results_dir / SOURCE_FILE
     if not source_path.is_file():
         raise ContractError(f"{source_path} is missing; run --shape before executing")
@@ -596,15 +733,23 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
             f"({source.get('source_digest')} then, {current} now); re-run from --shape"
         )
     executor = load_executor(results_dir)
+    checked = datetime.now(timezone.utc)
+    check_timestamps(executor, source, checked)
+    # With a bundle the executor wrote into the bundle, never into the results directory.
+    results_root = results_dir
+    if source.get("bundle"):
+        results_root = Path(source["bundle"]) / BUNDLE_RESULTS
+        if not results_root.is_dir():
+            raise ContractError(f"{results_root} does not exist; the executor writes its results there")
 
     entries = []
     for test_dir, case in cases:
-        result_dir = results_dir / case.name
+        result_dir = results_root / case.name
         if not result_dir.is_dir():
             entries.append({"name": case.name, "result": "not_run"})
             continue
         try:
-            result_dir.resolve().relative_to(results_dir.resolve())
+            result_dir.resolve().relative_to(results_root.resolve())
             if result_dir.is_symlink():
                 raise ValueError
         except ValueError:
@@ -614,7 +759,7 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
             continue
         entries.append(check_one(case, test_dir, result_dir, results_dir))
 
-    record = build_run_record(fm, source, executor, entries)
+    record = build_run_record(fm, source, executor, entries, checked)
     (results_dir / RUN_FILE).write_text(yaml.safe_dump(record, sort_keys=False, allow_unicode=True),
                                         encoding="utf-8")
 
@@ -647,12 +792,22 @@ def main(argv=None) -> int:
             return 2
         only = argv[i + 1]
         del argv[i:i + 2]
+    bundle_dir = None
+    if "--bundle" in argv:
+        i = argv.index("--bundle")
+        if not shape or i + 1 >= len(argv):  # a bundle is made by --shape, before execution
+            print(__doc__)
+            return 2
+        bundle_dir = Path(argv[i + 1])
+        del argv[i:i + 2]
     if len(argv) != 2 or any(a.startswith("-") for a in argv):
         print(__doc__)
         return 2
     tests_dir, results_dir = Path(argv[0]), Path(argv[1])
     try:
-        return cmd_shape(tests_dir, results_dir, only) if shape else cmd_check(tests_dir, results_dir, only)
+        if shape:
+            return cmd_shape(tests_dir, results_dir, only, bundle_dir)
+        return cmd_check(tests_dir, results_dir, only)
     except ContractError as e:
         print(f"[ERROR] {e}", file=sys.stderr)
         return 2

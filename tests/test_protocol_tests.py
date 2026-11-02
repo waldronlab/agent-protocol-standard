@@ -1,6 +1,7 @@
 """Protocol tests: the test.yaml schema, the validator's tests/ checks, and the checker."""
 import shutil
 import subprocess
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -148,8 +149,14 @@ def write_yaml(path: Path, data):
     path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
 
+def stamp(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def executor(results: Path, **extra):
-    data = {"started": "2026-10-20T04:30:00Z", "finished": "2026-10-20T04:31:00Z",
+    # Real times: the checker requires --shape <= finished <= the check.
+    now = datetime.now(timezone.utc)
+    data = {"started": stamp(now - timedelta(minutes=1)), "finished": stamp(now),
             "executor": {"agent": "pytest", "invocation": {"kind": "in-context"}}}
     data.update(extra)
     write_yaml(results / "executor.yaml", data)
@@ -254,6 +261,12 @@ def test_check_reports_failures(repo, tmp_path, capsys):
     assert record["tests"][0]["result"] == "fail" and len(record["tests"][0]["failures"]) == 4
 
 
+def check_variant(tests: Path, results: Path, *extra):
+    """Check one variant of a result. A run is checked once, so each variant is a fresh record."""
+    (results / "run.yaml").unlink(missing_ok=True)
+    return checker.main([*extra, str(tests), str(results)])
+
+
 def test_check_diagnostic_rules(repo, tmp_path, capsys):
     results = tmp_path / "results"
     tests = repo / "protocols/example-protocol/tests"
@@ -261,15 +274,15 @@ def test_check_diagnostic_rules(repo, tmp_path, capsys):
     executor(results)
     write_yaml(results / "orientation/result.yaml",
                {"outcome": "refused_for_orientation", "observation": "Features are in columns."})
-    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 0
+    assert check_variant(tests, results, "--test", "orientation") == 0
     # a refusal that still produced outputs fails
     write_yaml(results / "orientation/result.yaml",
                {"outcome": "refused_for_orientation", "observation": "x", "retained_features": ["C", "D"]})
-    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 1
+    assert check_variant(tests, results, "--test", "orientation") == 1
     assert "requires it absent" in capsys.readouterr().out
     # an unknown label or a missing observation fails
     write_yaml(results / "orientation/result.yaml", {"outcome": "gave_up"})
-    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 1
+    assert check_variant(tests, results, "--test", "orientation") == 1
     out = capsys.readouterr().out
     assert "not one of the accepted outcomes" in out and "observation: missing" in out
 
@@ -286,25 +299,25 @@ def test_check_expected_warning(repo, tmp_path, capsys):
     corrected = yaml.safe_load((results / "orientation/result.yaml").read_text())
     # the outputs are right but nobody was warned
     write_yaml(results / "orientation/result.yaml", {k: v for k, v in corrected.items() if k != "warnings"})
-    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 1
+    assert check_variant(tests, results, "--test", "orientation") == 1
     assert "no entry contains 'orientation'" in capsys.readouterr().out
     # a warning about something else does not count
     write_yaml(results / "orientation/result.yaml", {**corrected, "warnings": ["Low depth in s2."]})
-    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 1
+    assert check_variant(tests, results, "--test", "orientation") == 1
     # the match is case-insensitive
     write_yaml(results / "orientation/result.yaml", {**corrected, "warnings": ["ORIENTATION corrected."]})
-    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 0
+    assert check_variant(tests, results, "--test", "orientation") == 0
     # warnings must be a list of strings, in either mode
     write_yaml(results / "orientation/result.yaml", {**corrected, "warnings": "orientation"})
-    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 1
+    assert check_variant(tests, results, "--test", "orientation") == 1
     assert "must be a list of strings" in capsys.readouterr().out
     basic = yaml.safe_load((results / "basic/result.yaml").read_text())
     write_yaml(results / "basic/result.yaml", {**basic, "warnings": [1]})
-    assert checker.main(["--test", "basic", str(tests), str(results)]) == 1
+    assert check_variant(tests, results, "--test", "basic") == 1
     # a refusal need not warn
     write_yaml(results / "orientation/result.yaml",
                {"outcome": "refused_for_orientation", "observation": "Features are in columns."})
-    assert checker.main(["--test", "orientation", str(tests), str(results)]) == 0
+    assert check_variant(tests, results, "--test", "orientation") == 0
 
 
 def test_check_not_run_is_neither(repo, tmp_path, capsys):
@@ -650,3 +663,162 @@ def test_compare_value_scalars(tmp_path):
     assert cv("a", "a") == [] and cv("a", "b")
     assert cv([1, 2], [1, 2]) == [] and cv([1, 2], [2, 1])
     assert cv(1.0, 1.05, 0.1) == [] and cv(1.0, 1.2, 0.1)
+
+
+# ---------------------------------------------------------------------------
+# Check once, timestamps, and the bundle (ADR 0019)
+# ---------------------------------------------------------------------------
+
+def test_a_run_is_checked_once(repo, tmp_path, capsys):
+    results = tmp_path / "results"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys)
+    passing_results(results)
+    assert checker.main([str(tests), str(results)]) == 2           # no executor.yaml: no record,
+    assert not (results / "run.yaml").exists()                      # so it can be fixed and checked
+    executor(results)
+    assert checker.main([str(tests), str(results)]) == 0
+    first = (results / "run.yaml").read_text()
+    (results / "basic/retained.csv").write_text("feature,sample_1,sample_2\nC,0,0\nD,0,0\n")
+    assert checker.main([str(tests), str(results)]) == 2
+    assert "already checked" in capsys.readouterr().err
+    assert (results / "run.yaml").read_text() == first
+
+
+def test_timestamps_are_ordered_against_the_checker(repo, tmp_path, capsys):
+    results = tmp_path / "results"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys)
+    passing_results(results)
+    now = datetime.now(timezone.utc)
+    executor(results, started=stamp(now), finished=stamp(now - timedelta(minutes=1)))
+    assert checker.main([str(tests), str(results)]) == 2
+    assert "is after 'finished'" in capsys.readouterr().err
+    executor(results, started=stamp(now - timedelta(days=2)), finished=stamp(now - timedelta(days=1)))
+    assert checker.main([str(tests), str(results)]) == 2
+    assert "before --shape" in capsys.readouterr().err
+    executor(results, finished=stamp(now + timedelta(minutes=11)))
+    assert checker.main([str(tests), str(results)]) == 2
+    assert "later than now" in capsys.readouterr().err
+    executor(results, checked=stamp(now))
+    assert checker.main([str(tests), str(results)]) == 2            # reserved: the checker writes it
+    executor(results)
+    assert checker.main([str(tests), str(results)]) == 0
+    record = yaml.safe_load((results / "run.yaml").read_text())
+    source = yaml.safe_load((results / "source.yaml").read_text())
+    assert record["shaped"] == source["taken"]
+    assert record["shaped"] <= record["finished"] <= record["checked"]
+
+
+def test_bundle_holds_what_the_executor_may_see_and_nothing_else(repo, tmp_path, capsys):
+    results, bundle = tmp_path / "results", tmp_path / "bundle"
+    tests = repo / "protocols/example-protocol/tests"
+    rc, out = shape(repo, results, capsys, "--bundle", str(bundle))
+    assert rc == 0
+    files = sorted(p.relative_to(bundle).as_posix() for p in bundle.rglob("*") if p.is_file())
+    assert files == ["inputs/basic/input.csv", "inputs/orientation/input.csv", "protocol.md", "shape.yaml"]
+    assert (bundle / "results").is_dir() and not any((bundle / "results").iterdir())
+    assert (bundle / "protocol.md").read_bytes() == (tests.parent / "protocol.md").read_bytes()
+    assert yaml.safe_load((bundle / "shape.yaml").read_text()) == out
+    assert out["results_directory"] == str((bundle / "results").resolve())
+    basic = next(t for t in out["tests"] if t["name"] == "basic")
+    assert basic["test_directory"] == str((bundle / "inputs/basic").resolve())
+    assert basic["inputs"]["data"] == {"path": "input.csv"}
+    assert "6.5" not in (bundle / "shape.yaml").read_text()
+    # the executor writes into the bundle; the checker reads from there and records in results
+    passing_results(bundle / "results")
+    executor(results, executor={"agent": "pytest", "isolation": "subagent"})
+    assert checker.main([str(tests), str(results)]) == 0
+    record = yaml.safe_load((results / "run.yaml").read_text())
+    assert [t["result"] for t in record["tests"]] == ["pass", "pass"]
+    assert record["executor"]["isolation"] == "subagent"
+    assert not (bundle / "run.yaml").exists()
+
+
+def test_bundle_ignores_results_written_beside_the_record(repo, tmp_path, capsys):
+    results, bundle = tmp_path / "results", tmp_path / "bundle"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys, "--bundle", str(bundle))
+    passing_results(results)                                        # the wrong place
+    executor(results)
+    assert checker.main([str(tests), str(results)]) == 2            # nothing compared
+    assert "Nothing was compared." in capsys.readouterr().out
+
+
+def test_bundle_location_is_refused_before_anything_is_created(repo, tmp_path, capsys):
+    tests = str(repo / "protocols/example-protocol/tests")
+    results = tmp_path / "results"
+    for bundle in (repo / "bundle", results / "bundle"):
+        assert checker.main(["--shape", tests, str(results), "--bundle", str(bundle)]) == 2
+        assert not results.exists() and not bundle.exists()
+    bundle = tmp_path / "bundle"
+    assert checker.main(["--shape", tests, str(bundle / "results"), "--bundle", str(bundle)]) == 2
+    assert not bundle.exists()
+    bundle.mkdir()
+    (bundle / "left-over").write_text("x")
+    assert checker.main(["--shape", tests, str(results), "--bundle", str(bundle)]) == 2
+    assert not results.exists()
+    assert checker.main([tests, str(results), "--bundle", str(tmp_path / "b2")]) == 2   # only with --shape
+
+
+def _composite(repo: Path, deps: dict, uses: list):
+    """Make example-protocol use `uses`, and write each dependency in `deps` (name -> (version, uses))."""
+    pin = lambda name, version: {"name": name, "repository": "example/repo", "version": version}  # noqa: E731
+    md = repo / "protocols/example-protocol/protocol.md"
+    md.write_text(md.read_text().replace("protocols_used: []", "protocols_used: " + yaml.safe_dump(
+        [pin(*u) for u in uses], default_flow_style=True).strip()))
+    for name, (version, dep_uses) in deps.items():
+        fm = {"name": name, "version": version, "protocols_used": [pin(*u) for u in dep_uses]}
+        (repo / "protocols" / name).mkdir()
+        (repo / "protocols" / name / "protocol.md").write_text("---\n" + yaml.safe_dump(fm) + "---\n\n# x\n")
+        (repo / "protocols" / name / "tests").mkdir()
+        (repo / "protocols" / name / "tests" / "secret.csv").write_text("answer\n")
+
+
+def test_bundle_copies_dependencies_from_the_checkout(repo, tmp_path, capsys):
+    _composite(repo, {"dep-a": ("1.0.0", [("dep-b", "2.0.0")]), "dep-b": ("2.0.0", [])}, [("dep-a", "1.0.0")])
+    bundle = tmp_path / "bundle"
+    rc, _ = shape(repo, tmp_path / "results", capsys, "--bundle", str(bundle))
+    assert rc == 0
+    assert sorted(p.relative_to(bundle).as_posix() for p in (bundle / "protocols").rglob("*") if p.is_file()) == [
+        "protocols/dep-a/protocol.md", "protocols/dep-b/protocol.md"]   # transitively, and no tests
+
+
+@pytest.mark.parametrize("deps, uses, message", [
+    ({}, [("dep-a", "1.0.0")], "waits on #55"),
+    ({"dep-a": ("1.1.0", [])}, [("dep-a", "1.0.0")], "pins 'dep-a' at 1.0.0"),
+    ({"dep-a": ("1.0.0", [("dep-b", "1.0.0")]), "dep-b": ("2.0.0", [])},
+     [("dep-a", "1.0.0"), ("dep-b", "2.0.0")], "pinned at both"),
+])
+def test_bundle_refuses_dependencies_it_cannot_copy(repo, tmp_path, capsys, deps, uses, message):
+    _composite(repo, deps, uses)
+    tests = str(repo / "protocols/example-protocol/tests")
+    assert checker.main(["--shape", tests, str(tmp_path / "results"), "--bundle", str(tmp_path / "bundle")]) == 2
+    assert message in capsys.readouterr().err
+    assert not (tmp_path / "results").exists() and not (tmp_path / "bundle").exists()
+
+
+def test_bundle_copies_a_verified_remote_input(repo, tmp_path, capsys, monkeypatch):
+    import hashlib
+    data = b"feature,s1\nA,1\n"
+    test_yaml = repo / "protocols/example-protocol/tests/basic/test.yaml"
+    t = yaml.safe_load(test_yaml.read_text())
+    t["inputs"]["data"] = {"url": "https://example.org/remote.csv", "sha256": hashlib.sha256(data).hexdigest()}
+    test_yaml.write_text(yaml.safe_dump(t))
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return data
+
+    monkeypatch.setattr(checker.urllib.request, "urlopen", lambda url: Resp())
+    bundle = tmp_path / "bundle"
+    rc, out = shape(repo, tmp_path / "results", capsys, "--test", "basic", "--bundle", str(bundle))
+    assert rc == 0
+    assert out["tests"][0]["inputs"]["data"] == {"path": "remote.csv"}
+    assert (bundle / "inputs/basic/remote.csv").read_bytes() == data

@@ -159,7 +159,7 @@ RESERVED_RESULT_KEYS = ("outcome", "observation", "warnings")
 # Keys the checker writes into run.yaml itself; executor.yaml may not supply them.
 RESERVED_RUN_RECORD_KEYS = (
     "run_record", "protocol", "version", "repository", "protocol_commit",
-    "uncommitted", "source_digest", "checker", "tests",
+    "uncommitted", "source_digest", "shaped", "checked", "checker", "tests",
 )
 
 

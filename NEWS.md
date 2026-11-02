@@ -1,3 +1,23 @@
+# agent-protocol-standard (development version)
+
+## SIGNIFICANT USER-VISIBLE CHANGES
+
+* The executor of a protocol's tests is isolated from the checker (ADR 0019,
+  #59). `check_test_result.py` 0.3.0 and the `test-protocol` skill 0.3.0:
+
+  * `--shape --bundle <directory>` copies `protocol.md`, the protocols it uses,
+    each test's inputs, and the shape into a bundle, and nothing else. The
+    executor works from the bundle and writes into `<bundle>/results/`.
+  * `test-protocol` runs the executor as a fresh agent given only the bundle by
+    default, and checks its results itself; a single-session mode remains for
+    agent software that cannot start one. `executor.isolation` records which.
+  * A run is checked once. The checker refuses a results directory that
+    already holds `run.yaml`, where it used to overwrite it.
+  * `run.yaml` records `shaped` and `checked`, the checker's own times, and the
+    checker refuses executor timestamps that do not fit between them.
+
+  `run_record` stays at 1: keys are added, none changes meaning.
+
 # agent-protocol-standard 0.4.1 (2026-10-23)
 
 ## SIGNIFICANT USER-VISIBLE CHANGES

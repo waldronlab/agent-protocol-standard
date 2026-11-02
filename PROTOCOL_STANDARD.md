@@ -410,9 +410,20 @@ unverified bytes. The command also writes `source.yaml` into the results directo
 changes, and a digest of `protocol.md` and the tests directory. That is the snapshot the run is
 attributed to. It is taken before execution because the checkout can move afterwards.
 
-The executor performs the protocol in any language and writes its results into a **results
-directory** of its choosing, one subdirectory per test named after the test, each holding
-`result.yaml` and any output files. The results directory must be empty when `--shape` writes
+With `--bundle <bundle directory>`, `--shape` also copies everything the executor may see into a
+**bundle** (ADR 0019): `protocol.md`, the `protocol.md` of every protocol it uses, transitively, the
+files each test's inputs name, and the shape as `shape.yaml`, with input paths relative to each
+test's directory in the bundle. Nothing else is copied: no `test.yaml`, no expected file, and no
+dependency's tests. A dependency is copied from the checkout, found at
+`<protocols directory>/<name>/protocol.md` with the pinned version; one that is not there cannot be
+bundled until cross-repository resolution is defined (issue #55). The bundle must be new, outside
+the checkout, and neither inside the results directory nor containing it, since `--shape` caches
+remote expected files in the results directory.
+
+The executor performs the protocol in any language and writes its results, one subdirectory per
+test named after the test, each holding `result.yaml` and any output files. With a bundle they go
+in `<bundle>/results/`, and the executor needs nothing outside the bundle. Without one they go in
+the **results directory**. The results directory must be empty when `--shape` writes
 `source.yaml` into it, so a run can never be checked against a previous run's files, and it must
 lie outside the protocol directory, whose digest it would otherwise change. The checker refuses
 both. The executor does not read `expected_outputs` itself.
@@ -428,8 +439,12 @@ both. The executor does not read `expected_outputs` itself.
 
 `scripts/check_test_result.py <tests directory> <results directory>` compares every test that has a
 result subdirectory, or one with `--test <name>`, and is the only thing that decides pass or fail. A
-test with no result subdirectory is reported as not run, which is neither pass nor fail. Its
-comparison rules:
+test with no result subdirectory is reported as not run, which is neither pass nor fail. A run is
+checked **once**: the checker refuses a results directory that already holds `run.yaml`, because a
+failure message names the expected value, and a result corrected after reading one is no longer a
+blind execution. A failed run is reported as it stands; another attempt is a new run, from
+`--shape` in new directories. A contract error writes no record, so it can be corrected and the
+run checked. Its comparison rules:
 
 *   Numbers match within `numeric_tolerance`. Strings, booleans and nulls match exactly. Lists match
     element by element, in order. At the top level of `result.yaml`, a key missing from the result
@@ -449,8 +464,7 @@ comparison rules:
 ### The run record
 
 A run is not a review and adds nothing to the protocol. The checker writes `run.yaml` at the top of
-the results directory, one record covering every test it compared, overwriting any earlier record
-there:
+the results directory, one record covering every test it compared:
 
 ```yaml
 run_record: 1                   # schema version of this record
@@ -462,17 +476,20 @@ uncommitted: false              # true, with no commit, if the checkout was dirt
 source_digest: sha256:9f2c...   # digest of protocol.md and tests/, from source.yaml
 started: 2026-10-18T14:02:11Z   # UTC timestamps, from the executor
 finished: 2026-10-18T14:09:40Z
+shaped: 2026-10-18T14:02:05Z    # UTC timestamps, from the checker: when --shape ran,
+checked: 2026-10-18T14:09:52Z   # and when the results were compared
 executor:
   agent: claude-code            # the agent or person that performed the protocol
   harness: Claude Code 2.1.0    # the agent software and version, distinct from the model
   model: claude-fable-5-1       # omitted for a human executor
   language: R                   # what the execution was written in, if known
+  isolation: subagent           # subagent | container | none
   invocation:                   # how the protocol reached the agent
     kind: skill                 # skill | in-context | unguided
-    skill: test-protocol 0.2.0  # name and version, for kind: skill
+    skill: test-protocol 0.3.0  # name and version, for kind: skill
   prompt: |                     # verbatim text that started the run
     Run the tests for independent-filtering-variance.
-checker: check_test_result.py 0.2.0
+checker: check_test_result.py 0.3.0
 tests:
   - name: variance_rows
     result: pass                # pass | fail | not_run (no result subdirectory)
@@ -488,17 +505,25 @@ them into the record and fills the rest from the test directory and its own vers
 `source.yaml`, written by `--shape` before execution. The checker recomputes the digest from the
 current checkout and refuses to write a record if it differs, so a record never names a commit
 that does not contain what was executed. A run from a dirty checkout records `uncommitted: true`
-and no commit. Within `executor`, `agent` is required; `harness`,
-`model`, `language`, `invocation`, and `prompt` are optional, since a human executor has no prompt
-and a prompt may hold paths or data its author does not want shared. An agent running a skill
-fills all of them. `invocation.kind` distinguishes a run through a skill, a run with the protocol
-text supplied in context, and a run given no protocol at all; two runs that differ only there are
-different experiments. Additional keys, at the top level of `executor.yaml` or
-under `executor`, are permitted and preserved, so a study that records cost, token counts,
-attempts, or an experimental condition adds them without a schema change. The keys the checker
-writes itself, `run_record`, `protocol`, `version`, `repository`, `protocol_commit`,
-`uncommitted`, `source_digest`, `checker`, and `tests`, are reserved: an `executor.yaml` that supplies any of them is rejected rather than
-silently overridden. `run_record` is incremented when a defined key changes meaning.
+and no commit. The checker also refuses a record whose times do not fit between its own:
+`started` must not be after `finished`, `finished` must not be before `shaped`, since execution
+follows `--shape`, and `finished` must not be later than `checked`. A time written by hand can
+still pass these rules, but `shaped` and `checked` bound the run whatever the executor wrote. Within `executor`, `agent` is required; `harness`,
+`model`, `language`, `isolation`, `invocation`, and `prompt` are optional, since a human executor
+has no prompt and a prompt may hold paths or data its author does not want shared. An agent
+running a skill fills all of them. `invocation.kind` distinguishes a run through a skill, a run
+with the protocol text supplied in context, and a run given no protocol at all; two runs that
+differ only there are different experiments. `isolation` says what separated the executor from
+the tests: `subagent`, a fresh agent given only the bundle; `container`, an executor that could
+reach nothing but the bundle; or `none`, an executor in the same session as whoever invoked it.
+Two runs that differ only there are different experiments too. Additional keys, at the top level
+of `executor.yaml` or under `executor`, are permitted and preserved, so a study that records
+cost, token counts, attempts, or an experimental condition adds them without a schema change.
+The keys the checker writes itself, `run_record`, `protocol`, `version`, `repository`,
+`protocol_commit`, `uncommitted`, `source_digest`, `shaped`, `checked`, `checker`, and `tests`,
+are reserved: an `executor.yaml` that supplies any of them is rejected rather than silently
+overridden. `run_record` is incremented when a defined key changes meaning; adding a key does not
+change the meaning of the others.
 
 Where run records are kept is not yet defined (issue #44). Attach the record to the pull request or
 issue it is relevant to.
@@ -513,7 +538,7 @@ and measuring how often is what the tests are for.
 CI validates each `test.yaml` against this schema and checks that local files exist, through the
 same `scripts/validate_protocol.py` that validates `protocol.md`. It does not fetch remote files or
 execute tests. The `test-protocol` skill in this repository implements the result contract for an
-agent.
+agent, executing from a bundle in a fresh executor by default.
 
 ## Example Protocol
 
