@@ -80,8 +80,9 @@ def test_composite_requires_dependencies():
 
 The `test.yaml` schema is `TestCase` in `scripts/models.py`, beside the frontmatter model, and
 `validate_protocol.py` applies it to every `tests/<name>/` under a protocol. `scripts/check_test_result.py`
-is the checker: `--shape` prints what an executor must produce and snapshots the source, the plain
-invocation compares results and writes `run.yaml`. `tests/test_protocol_tests.py` covers the schema in
+is the checker: `--shape` prints what an executor must produce and snapshots the source, `--bundle`
+copies what the executor may see into a directory of its own (ADR 0019), and the plain invocation
+compares results and writes `run.yaml`, once per run. `tests/test_protocol_tests.py` covers the schema in
 memory, the validator against `tests/fixtures/valid/with-tests` and the `invalid/test-*` fixtures, and
 the checker end to end in a throwaway git repository. A rule added to the "Tests" section of the
 standard gets a fixture or a checker test, as for the frontmatter.
