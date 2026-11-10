@@ -1,6 +1,6 @@
 # 0019. Isolate the Executor from the Checker
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-02
 - **Deciders:** Levi Waldron, Otto Infield-Harm
 
