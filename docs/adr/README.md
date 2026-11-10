@@ -20,8 +20,8 @@ This directory contains Architecture Decision Records (ADRs) for the `agent-prot
 - [0014. Ask Two Citation Questions, and Require the Answerable One](0014-two-citation-questions.md) — amends 0009 and 0012
 - [0015. Migrate Protocol Validator to Python and Pydantic](0015-migrate-validator-to-python.md)
 - [0016. Protocol Tests: Fixtures, a Result Contract, and a Review Status](0016-protocol-tests.md)
-- [0017. Conditions on Materials: Where They Live and What a Violation Means](0017-conditions-on-materials.md) — proposed; extends 0012 and 0016
+- [0017. Conditions on Materials: Where They Live and What a Violation Means](0017-conditions-on-materials.md) — extends 0012 and 0016
 - [0018. Resolve Dependencies from the Composite, Not the Index](0018-resolve-dependencies-without-the-index.md) — amends 0004 and 0008
-- [0019. Isolate the Executor from the Checker](0019-isolate-the-executor-from-the-checker.md) — proposed; amends 0016
+- [0019. Isolate the Executor from the Checker](0019-isolate-the-executor-from-the-checker.md) — amends 0016
 
 
