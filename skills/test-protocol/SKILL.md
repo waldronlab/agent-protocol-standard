@@ -1,7 +1,7 @@
 ---
 name: test-protocol
 description: Execute a protocol's tests from a bundle that holds only what the executor may see, by default in a fresh executor, then check the results once with the deterministic checker
-version: 0.3.0
+version: 0.4.0
 category: protocols
 author: waldronlab
 tags: [protocol, tests, benchmark, verification, provenance]
@@ -13,7 +13,8 @@ Runs the tests a protocol carries under `protocols/<name>/tests/`, following the
 in the "Tests" section of `PROTOCOL_STANDARD.md`. The executor performs the protocol from a
 **bundle** that holds the protocol, its inputs and the result shape, and nothing else. Whoever
 invoked the executor checks the results, once. The checker decides pass or fail. See
-[ADR 0019](../../docs/adr/0019-isolate-the-executor-from-the-checker.md).
+[ADR 0019](../../docs/adr/0019-isolate-the-executor-from-the-checker.md) and
+[ADR 0020](../../docs/adr/0020-record-what-decides-a-runs-outcome.md).
 
 ## Rules
 
@@ -28,6 +29,11 @@ such, not repaired.
    the person asks for one.
 4. Take every timestamp from the clock, `date -u +%Y-%m-%dT%H:%M:%SZ`. Never write one by hand.
 5. Change nothing in the protocol, its tests, or the bundle's `protocol.md`.
+6. Every run started with `--shape` ends in a check, including one you stop before the executor
+   finishes. Record why in `abandoned` and check it like any other run. Never discard a run
+   because it looks bad.
+7. The executor's reply is not evidence. It can report a result for every test while having
+   written none. The checker's report is the evidence.
 
 ## Usage
 
@@ -50,8 +56,9 @@ such, not repaired.
   protocol: a subagent, a separate agent session, or an agent in a container. It is told only
   where the bundle is, so it does not know where the tests are, and it never sees checker
   output, so it cannot learn an answer from a failure. Use it whenever your agent software can
-  start one. Record `isolation: subagent`, or `isolation: container` when the executor runs
-  where only the bundle is mounted.
+  start one. Record `isolation: subagent`, or `isolation: container` when the executor could
+  reach nothing but the bundle, and say how in `isolation_method`: a container with only the
+  bundle mounted, an OS sandbox, or a virtual machine.
 - **Single session**, when no fresh executor can be started or the person asks for it. You
   perform the protocol yourself from the bundle. Record `isolation: none`.
 
@@ -101,6 +108,11 @@ waits on `waldronlab/agent-protocol-standard#55`.
 3. When it replies, record `finished` from the clock.
 4. Do not read, fix, or complete its results. What it wrote is the run.
 
+If you stop the executor before it replies, for example because the harness broke, it ran past a
+time limit, or the person asked you to, record `finished` from the clock when you stop it and
+`abandoned: <reason>` in step 4, then continue to step 5. Do not start another executor in the
+same directories.
+
 **Single session:** record `started`, follow the executor brief yourself, then record
 `finished`.
 
@@ -119,16 +131,37 @@ executor:
   isolation: subagent            # subagent | container | none
   invocation:
     kind: skill
-    skill: test-protocol 0.3.0
+    skill: test-protocol 0.4.0
   prompt: |
     Run the tests for independent-filtering-variance.
 ```
 
 `agent` is required. Fill the rest when you know it. `prompt` is the person's prompt; the
-executor brief is fixed by this skill's version, so it is not recorded again. Do not write
-`run_record`, `protocol`, `version`, `repository`, `protocol_commit`, `uncommitted`,
-`source_digest`, `shaped`, `checked`, `checker`, or `tests`; the checker owns those.
-Additional keys, such as token counts or an experimental condition, are kept.
+executor brief is fixed by this skill's version, so it is not recorded again.
+
+Also record, when you know them, the settings that decide whether a run can finish. They are
+recommended keys, not yet defined ones, so record them under these names:
+
+```yaml
+executor:
+  # ...as above, plus:
+  harness_config:                # every setting that changes the executor's behaviour
+    context_window: 16384
+    max_output_tokens: 8192
+    reasoning: kept-out-of-context
+    system_prompt_digest: sha256:...
+  model_digest: sha256:...       # open-weight models: a tag such as qwen3:4b can move
+  quantization: Q4_K_M           # open-weight models
+  isolation_method: "OS sandbox: read/write bundle only, no network"
+```
+
+For a run you stopped, add `abandoned: <reason>` at the top level, beside `started` and
+`finished`.
+
+Do not write `run_record`, `protocol`, `version`, `repository`, `protocol_commit`,
+`uncommitted`, `source_digest`, `results_digest`, `shaped`, `checked`, `checker`, or `tests`;
+the checker owns those. Additional keys, such as token counts or an experimental condition, are
+kept.
 
 ### 5. Check, once
 
@@ -138,10 +171,12 @@ python3 scripts/check_test_result.py <protocol>/tests <results directory>
 
 The checker reads the results from the bundle, compares every test that has a result
 subdirectory, prints each as PASS, FAIL, or NOT_RUN with the failing comparisons, and writes
-`run.yaml` into the results directory. Exit status 0 means every compared test passed, and 1
-means at least one failed.
+`run.yaml` into the results directory, with `results_digest`, a digest of the results it
+compared. Exit status 0 means every compared test passed, and 1 means at least one failed.
 
-Exit status 2 means the contract was not met and no record was written:
+Exit status 2 has two meanings. If the checker printed "Nothing was compared", no test had a
+result, and the record was written: it is the run's record, reported like any other. This is
+usual for an abandoned run. Otherwise the contract was not met and no record was written:
 
 - A problem in `executor.yaml`, such as a missing field: correct it, using only the times you
   recorded from the clock, and check again.
@@ -193,7 +228,8 @@ what you wrote, then the language you used.
 ## Output Format
 
 1. The mode, and the results and bundle directories.
-2. For each test, what the executor did, from its reply, and where its `result.yaml` is.
+2. For each test, what the executor said it did, from its reply, and where its `result.yaml`
+   is. The reply is not evidence; where it disagrees with the checker's report, say so.
 3. The checker's report, verbatim.
 4. The contents of `run.yaml`, so the person can attach it to the pull request or issue it
    belongs to. A run is not a review; do not add anything to `protocol.md`.
@@ -202,7 +238,7 @@ what you wrote, then the language you used.
    or the test is wrong is found out afterwards.
 6. A closing line naming this skill and its version:
 
-   > 🛠️ Skill executed: `test-protocol` v`0.3.0` (`waldronlab/agent-protocol-standard`)
+   > 🛠️ Skill executed: `test-protocol` v`0.4.0` (`waldronlab/agent-protocol-standard`)
 
 ## Notes
 
@@ -210,7 +246,7 @@ what you wrote, then the language you used.
   the filesystem can still go looking for the checkout. For a run offered as evidence, such as
   one cited by a `verified-with-benchmark` review or the benchmarking study in
   `waldronlab/agent-protocol-standard#5`, run the executor where only the bundle is mounted and
-  record `isolation: container`.
+  record `isolation: container` with `isolation_method`.
 - This skill tests execution, not conformance. Whether `protocol.md` conforms to the standard is
   the validator's job (`scripts/validate_protocol.py`).
 - Where run records are kept is not yet defined (`waldronlab/agent-protocol-standard#44`).
