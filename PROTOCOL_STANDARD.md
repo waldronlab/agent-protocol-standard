@@ -529,17 +529,20 @@ OS sandbox around a tool loop, or a virtual machine all qualify, and say which i
 `abandoned`, at the top level of `executor.yaml`, is the reason a run was stopped before the
 executor finished, for example a broken harness or a time limit. When present it must be
 non-empty text, and the checker copies it into the record. An abandoned run is checked like any
-other, and every test it has no result for is `not_run`. Without the key, a run whose harness
+other, and every test it has no result for is `not_run`. It does not change the exit status, which
+reports only the tests compared: an abandoned run whose compared tests all passed exits 0, as any
+run with `not_run` tests does. Whether a run was abandoned is read from the record. Without the key, a run whose harness
 broke and a run whose executor wrote nothing look the same.
 
 `results_digest` is a sha256 over the results the checker compared, taken at check time and
 computed as `source_digest` is: for each file, in order of its path, the path, a NUL byte, its
-contents and a NUL byte. With a bundle it covers every file under `<bundle>/results/`, including
-files the executor left there beyond its results, and not `<bundle>/work/`. Without one it covers
+contents and a NUL byte. With a bundle it covers every file under `<bundle>/results/` except symlinks,
+including files the executor left there beyond its results, and not `<bundle>/work/`. Without one it covers
 the subdirectories of the results directory, not its top-level files, which belong to the invoker
 and the checker, and not the checker's download cache. Each path is written as
 `results/<path under that directory>`, so a copy of the results kept anywhere as `results/` can be
-shown to be the one that was checked. Symlinks are neither followed nor covered. The executor's
+shown to be the one that was checked. Symlinks, in either case, are neither followed nor covered,
+so a copy that replaces one with the file it points to does not match. The executor's
 reply is not evidence of what it wrote: an executor can report a result for every test while
 writing none. The record and the results it digests are.
 

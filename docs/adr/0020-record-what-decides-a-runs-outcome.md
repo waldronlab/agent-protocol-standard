@@ -36,8 +36,8 @@ The checker writes `results_digest` into `run.yaml`: a sha256 over the results, 
 time, before comparing, and computed as `source_digest` is: for each file in order of its path,
 the path, a NUL byte, the contents and a NUL byte.
 
-- With a bundle it covers every file under `<bundle>/results/`, including files the executor left
-  there beyond its results. It does not cover `<bundle>/work/`, the executor's scratch space.
+- With a bundle it covers every file under `<bundle>/results/` except symlinks (below), including
+  files the executor left there beyond its results. It does not cover `<bundle>/work/`, the executor's scratch space.
 - Without a bundle it covers the subdirectories of the results directory. The top-level files
   (`source.yaml`, `executor.yaml`) are the invoker's and the checker's, and `.remote/` is the
   checker's download cache.
@@ -45,7 +45,9 @@ the path, a NUL byte, the contents and a NUL byte.
   `results/` beside its `run.yaml`, as the archive keeps it, can be recomputed without knowing
   where the bundle was.
 - Symlinks are neither followed nor covered. `source_digest` refuses them, but the executor
-  controls the results tree, and a refusal would let it prevent its own record.
+  controls the results tree, and a refusal would let it prevent its own record. The omission is
+  not silent where it matters: the archive refuses symlinks, and a copy that replaces one with the
+  file it points to no longer matches the digest.
 
 `results_digest` is reserved: `executor.yaml` may not supply it.
 
@@ -55,6 +57,11 @@ A run stopped before the executor finished still gets an `executor.yaml`, with `
 <reason>` at the top level, and is checked. `abandoned` is a defined key: when present it is
 non-empty text, and the checker copies it into the record and prints it. The checker needs no
 other change. It already records every test without a result as `not_run`.
+
+`abandoned` does not change the exit status. The exit status reports only the tests compared, so an
+abandoned run whose compared tests all passed exits 0, as any run with `not_run` tests already
+does. Whether a run was abandoned, and how many tests were not run, is read from the record, which
+is what the archive and its index count.
 
 The `test-protocol` skill gains the rule that every run started with `--shape` ends in a check.
 The checker cannot enforce it, since a run that is never checked leaves nothing for it to see.
@@ -111,6 +118,9 @@ at 1: keys are added, and none changes meaning.
 - **Hash paths relative to `results/`, without the prefix.** Equivalent in strength. The prefix
   matches how the archive keeps a run, `results/` beside `run.yaml`, and how `source_digest`
   names its files relative to the protocol directory (`tests/...`).
+- **A nonzero exit status for an abandoned run.** Rejected: the exit status reports comparisons,
+  and a run with `not_run` tests already exits 0 when the rest pass. Making `abandoned` change it
+  would give the same results two exit statuses depending on why tests were not run.
 - **A new exit status for "nothing compared".** Rejected: the record's presence already tells
   the two cases apart, and a new status would change what callers of 0.3.0 see.
 
