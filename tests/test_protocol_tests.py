@@ -840,3 +840,121 @@ def test_bundle_refuses_input_paths_before_anything_is_created(repo, tmp_path, c
                          "--test", "basic"]) == 2
     assert message in capsys.readouterr().err
     assert not (tmp_path / "results").exists() and not (tmp_path / "bundle").exists()
+
+
+# ---------------------------------------------------------------------------
+# What decides a run's outcome (ADR 0020)
+# ---------------------------------------------------------------------------
+
+def archived_digest(results: Path) -> str:
+    """The digest as agent-protocol-runs recomputes it from an archived results/ directory,
+    written independently of the checker: paths relative to the run directory."""
+    import hashlib
+    h = hashlib.sha256()
+    run_dir = results.parent
+    for p in sorted((p for p in results.rglob("*") if p.is_file()),
+                    key=lambda p: p.relative_to(run_dir).as_posix()):
+        h.update(p.relative_to(run_dir).as_posix().encode("utf-8") + b"\0" + p.read_bytes() + b"\0")
+    return "sha256:" + h.hexdigest()
+
+
+def test_results_digest_covers_the_bundle_results_and_nothing_else(repo, tmp_path, capsys):
+    results, bundle = tmp_path / "results", tmp_path / "bundle"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys, "--bundle", str(bundle))
+    passing_results(bundle / "results")
+    (bundle / "results/notes.txt").write_text("an extra file the executor left\n")
+    (bundle / "work").mkdir()
+    (bundle / "work/script.py").write_text("print(1)\n")
+    executor(results)
+    assert checker.main([str(tests), str(results)]) == 0
+    record = yaml.safe_load((results / "run.yaml").read_text())
+    assert record["results_digest"] == archived_digest(bundle / "results")
+    # an archived copy of results/ alone reproduces it, wherever it is kept
+    copy = tmp_path / "archive/run/results"
+    shutil.copytree(bundle / "results", copy)
+    assert archived_digest(copy) == record["results_digest"]
+    (copy / "basic/retained.csv").write_text("feature,sample_1,sample_2\nC,5,8.0\nD,10,11\n")
+    assert archived_digest(copy) != record["results_digest"]
+
+
+def test_results_digest_without_a_bundle_covers_the_test_subdirectories(repo, tmp_path, capsys):
+    results = tmp_path / "results"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys)
+    passing_results(results)
+    (results / checker.CACHE_DIR).mkdir()
+    (results / checker.CACHE_DIR / "cached.csv").write_text("id\n1\n")
+    executor(results)
+    assert checker.main([str(tests), str(results)]) == 0
+    record = yaml.safe_load((results / "run.yaml").read_text())
+    copy = tmp_path / "archive/run/results"
+    for name in ("basic", "orientation"):
+        shutil.copytree(results / name, copy / name)
+    assert record["results_digest"] == archived_digest(copy)
+
+
+def test_results_digest_skips_symlinks_rather_than_refusing_the_run(repo, tmp_path, capsys):
+    results, bundle = tmp_path / "results", tmp_path / "bundle"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys, "--bundle", str(bundle))
+    passing_results(bundle / "results")
+    expected = archived_digest(bundle / "results")      # the archive refuses symlinks outright
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "x.txt").write_text("x\n")
+    (bundle / "results/link.txt").symlink_to(outside / "x.txt")
+    (bundle / "results/linked-dir").symlink_to(outside)
+    executor(results)
+    assert checker.main([str(tests), str(results)]) == 0
+    assert yaml.safe_load((results / "run.yaml").read_text())["results_digest"] == expected
+
+
+def test_results_digest_is_reserved(repo, tmp_path, capsys):
+    results = tmp_path / "results"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys)
+    passing_results(results)
+    executor(results, results_digest="sha256:00")
+    assert checker.main([str(tests), str(results)]) == 2
+    assert "results_digest" in capsys.readouterr().err
+    assert not (results / "run.yaml").exists()
+
+
+def test_an_abandoned_run_is_checked_and_recorded(repo, tmp_path, capsys):
+    results, bundle = tmp_path / "results", tmp_path / "bundle"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys, "--bundle", str(bundle))
+    executor(results, abandoned="the harness stopped returning tool results")
+    # nothing compared: exit 2, but with a record, unlike a contract error
+    assert checker.main([str(tests), str(results)]) == 2
+    out = capsys.readouterr().out
+    assert "Abandoned: the harness stopped returning tool results" in out
+    assert "Nothing was compared." in out
+    record = yaml.safe_load((results / "run.yaml").read_text())
+    assert record["abandoned"] == "the harness stopped returning tool results"
+    assert [t["result"] for t in record["tests"]] == ["not_run", "not_run"]
+    assert record["results_digest"] == archived_digest(bundle / "results")
+
+
+def test_an_abandoned_run_compares_what_was_written(repo, tmp_path, capsys):
+    results, bundle = tmp_path / "results", tmp_path / "bundle"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys, "--bundle", str(bundle))
+    passing_results(bundle / "results")
+    shutil.rmtree(bundle / "results/orientation")
+    executor(results, abandoned="stopped by the invoker after 30 minutes")
+    assert checker.main([str(tests), str(results)]) == 0
+    record = yaml.safe_load((results / "run.yaml").read_text())
+    assert [t["result"] for t in record["tests"]] == ["pass", "not_run"]
+
+
+@pytest.mark.parametrize("reason", ["", "   ", True, ["broken"]])
+def test_abandoned_needs_a_reason(repo, tmp_path, capsys, reason):
+    results = tmp_path / "results"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys)
+    executor(results, abandoned=reason)
+    assert checker.main([str(tests), str(results)]) == 2
+    assert "abandoned" in capsys.readouterr().err
+    assert not (results / "run.yaml").exists()
