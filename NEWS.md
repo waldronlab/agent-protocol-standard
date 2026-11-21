@@ -17,6 +17,9 @@
     bibliographic detail is added from memory.
   * With no method origin to cite, the Level 2 heading is left out, not
     written with "None" under it.
+  * The Publication DOI line is omitted when `protocol_citation` equals either
+    the Repository DOI or the Protocol DOI, as step 5.1 already said. The
+    template named only the Repository DOI.
   * Where no protocol matches, or the registry cannot be reached, the agent
     says so and carries on without a protocol: no Provenance block, and no
     DOI given from memory. An unreachable registry no longer stops an

@@ -29,3 +29,12 @@ def test_protocol_runner_examples_cite_no_literal_doi():
     # skill must not show an agent a DOI to copy.
     _, body = read_skill("protocol-runner")
     assert not re.findall(r"\b10\.\d{4,9}/[^\s`\"')\]]+", body)
+
+
+def test_protocol_runner_template_omits_a_duplicate_publication_doi():
+    # Step 5.1: a protocol_citation equal to artifact_doi or collection_doi is a first
+    # definition, and the same DOI must not be cited twice. The template must say so for
+    # both, so an agent following only the template cannot repeat either.
+    _, body = read_skill("protocol-runner")
+    line = next(ln for ln in body.splitlines() if ln.strip().startswith("Publication DOI:"))
+    assert "Repository DOI" in line and "Protocol DOI" in line

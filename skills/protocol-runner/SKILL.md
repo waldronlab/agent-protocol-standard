@@ -94,7 +94,7 @@ silent substitution this skill is meant to prevent:
    Repository: [Repository Name], protocol: [Protocol Name] v[Version] ([date])
    Repository DOI: [collection_doi if present]
    Protocol DOI: [artifact_doi if present]
-   Publication DOI: [protocol_citation — omit this line when it equals the Repository DOI above, which means this protocol is a first definition published there]
+   Publication DOI: [protocol_citation — omit this line when it equals the Repository DOI or the Protocol DOI above, which means this protocol is a first definition published there, and the same DOI must not appear twice]
    Trust tier: [trust_tier]
    License: [license]
 
