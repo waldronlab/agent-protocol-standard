@@ -394,6 +394,49 @@ def test_level2_heading_in_methods_does_not_count_when_no_origin():
     assert "level2_absent" not in failed(SELF_CITED, text)
 
 
+# --- From the third review of the PR ----------------------------------------------
+
+@pytest.mark.parametrize("frontmatter", [
+    "name: x\n",                                          # no version
+    "name: x\nversion: 1.0.0\nprotocols_used: oops\n",
+    "name: x\nversion: 1.0.0\nprotocols_used: [a, b]\n",   # entries are not mappings
+    "name: x\nversion: 1.0.0\nprotocols_used:\n  - name: y\n",   # no version
+    "name: x\nversion: 1.0.0\nprotocols_used:\n  - {name: [1], version: 1}\n",
+    "name: x\nversion: 1.0.0\ncollection_doi: 12345\n",
+    "name: x\nversion: 1.0.0\nmethod_origin_citation: [10.1/a]\n",
+    "name: x\nversion: [1]\n",
+    "name: x\nversion: 1.0.0\nlicense: {a: b}\n",
+])
+def test_unusable_frontmatter_shapes_are_contract_errors(tmp_path, frontmatter):
+    proto = tmp_path / "p"
+    proto.mkdir()
+    (proto / "protocol.md").write_text("---\n" + frontmatter + "---\n# x\n")
+    out = tmp_path / "out.md"
+    out.write_text(block(BASIC_L1, "- 10.1000/example"))
+    assert cc.main([str(proto), str(out), "--protocols-dir", str(tmp_path)]) == 2
+
+
+def test_level1_heading_in_a_later_section_is_not_the_blocks():
+    text = ("## Method Provenance\nI could not find the protocol.\n\n"
+            "## Departures\n### Protocol Citation (Level 1)\n" + BASIC_L1 + "\n")
+    assert "level1_heading" in failed(BASIC, text)
+
+
+def test_repeated_block_heading_is_still_read():
+    text = ("## Method Provenance (emitted before any execution step)\n\n"
+            + block(BASIC_L1, "- 10.1000/example"))
+    assert failed(BASIC, text) == set()
+
+
+def test_repository_doi_line_rejected_when_there_is_no_collection_doi():
+    # basic has no collection_doi: its Level 1 must omit the line, not fill it.
+    l1 = BASIC_L1.replace("Publication DOI", "Repository DOI: 10.1000/example-procedure\nPublication DOI")
+    assert "level1_repository_doi" in failed(BASIC, block(l1, "- 10.1000/example"))
+    assert "level1_repository_doi" not in failed(BASIC, block(BASIC_L1, "- 10.1000/example"))
+    none_line = BASIC_L1.replace("Publication DOI", "Repository DOI: none\nPublication DOI")
+    assert "level1_repository_doi" not in failed(BASIC, block(none_line, "- 10.1000/example"))
+
+
 def test_exit_codes(tmp_path, capsys):
     good = tmp_path / "good.md"
     good.write_text(block(BASIC_L1, "- 10.1000/example"))

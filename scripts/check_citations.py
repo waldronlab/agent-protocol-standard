@@ -105,7 +105,31 @@ def load_protocol(protocol_dir):
         raise ContractError(f"{path} has unreadable frontmatter: {exc}") from exc
     if not isinstance(fm, dict) or not fm.get("name"):
         raise ContractError(f"{path} has no readable frontmatter")
+    validate_frontmatter(fm, path)
     return fm
+
+
+STRING_FIELDS = ("name", "license", "type", "collection_doi", "artifact_doi",
+                 "protocol_citation", "method_origin_citation")
+
+
+def validate_frontmatter(fm, path):
+    """Raise ContractError unless the fields this checker reads have the shapes it
+    relies on. The standard's validator is the authority on the full schema; this only
+    protects the checker from a file it cannot read, so it exits 2 and says why."""
+    for key in STRING_FIELDS:
+        if fm.get(key) is not None and not isinstance(fm[key], str):
+            raise ContractError(f"{path}: `{key}` must be a string, found {fm[key]!r}")
+    if fm.get("version") is None or isinstance(fm["version"], (dict, list, bool)):
+        raise ContractError(f"{path}: `version` is missing or not a version string")
+    used = fm.get("protocols_used")
+    if used is not None and not isinstance(used, list):
+        raise ContractError(f"{path}: `protocols_used` must be a list")
+    for entry in used or []:
+        if not isinstance(entry, dict) or not isinstance(entry.get("name"), str) \
+                or entry.get("version") is None or isinstance(entry["version"], (dict, list, bool)):
+            raise ContractError(
+                f"{path}: each `protocols_used` entry needs a `name` and a `version`, found {entry!r}")
 
 
 def resolve_dependencies(fm, protocols_dir):
@@ -146,13 +170,21 @@ def _heading_level(line):
     return len(re.match(r"^(#{1,6})", line).group(1))
 
 
+PROVENANCE_TITLES = ("Method Provenance", "Protocol Citation (Level 1)",
+                     "Primary Literature to Cite (Level 2)")
+
+
 def _section_boundary(lines, start, level):
     """Index of the first heading after `start` of `level` or higher (fewer `#`), or
     len(lines). A later section of the agent's output, such as Departures or Methods,
-    is not part of the provenance block, whatever headings it contains."""
+    is not part of the provenance block, whatever headings it contains. The block's own
+    headings do not end it, so an agent that repeats the heading, or nests the block
+    under its own, is still read."""
     for i in range(start + 1, len(lines)):
         if HEADING.match(lines[i]) and _heading_level(lines[i]) <= level:
-            return i
+            title = lines[i].lstrip("# ").strip()
+            if not title.startswith(PROVENANCE_TITLES):
+                return i
     return len(lines)
 
 
@@ -206,7 +238,10 @@ def split_block(text):
     """
     lines = text.split("\n")
     top = _heading_line(lines, BLOCK_HEADING.lstrip("# "))
-    l1 = _heading_line(lines, LEVEL1_HEADING.lstrip("# "), top or 0)
+    # Level 1 is searched only inside the provenance block, as Level 2 is below.
+    l1_end_search = _section_boundary(lines, top, _heading_level(lines[top])) \
+        if top is not None else None
+    l1 = _heading_line(lines, LEVEL1_HEADING.lstrip("# "), top or 0, l1_end_search)
     if top is None and l1 is None:
         return False, None, None, None, text
     first = top if top is not None else l1
@@ -377,8 +412,7 @@ def check(protocol_dir, output_text, trust_tier=None, protocols_dir=None, resolv
                            f"{label} correctly gives no DOI" if ok else
                            f"{label} should give no DOI, found: {', '.join(ids)}")
 
-            if collection:
-                doi_line("Repository DOI", collection, True)
+            doi_line("Repository DOI", collection, collection is not None)
             doi_line("Protocol DOI", artifact, artifact is not None)
             if first_definition:
                 doi_line("Publication DOI", None, False)
