@@ -99,7 +99,10 @@ def load_protocol(protocol_dir):
     path = Path(protocol_dir) / "protocol.md"
     if not path.is_file():
         raise ContractError(f"no protocol.md in {protocol_dir}")
-    fm = extract_frontmatter(path)
+    try:
+        fm = extract_frontmatter(path)
+    except Exception as exc:  # malformed YAML, unreadable or non-UTF-8 file
+        raise ContractError(f"{path} has unreadable frontmatter: {exc}") from exc
     if not isinstance(fm, dict) or not fm.get("name"):
         raise ContractError(f"{path} has no readable frontmatter")
     return fm
@@ -128,15 +131,29 @@ RULE = re.compile(r"^\s*(-{3,}|\*{3,}|_{3,})\s*$")
 FENCE = re.compile(r"^\s*(```|~~~)")
 
 
-def _heading_line(lines, title, start=0):
-    """Index of the first heading line whose text starts with `title`, at any heading
-    level, or None. The level is not checked: agents nest the block under their own
-    headings, and what matters is that the heading is there."""
+def _heading_line(lines, title, start=0, end=None):
+    """Index of the first heading line in lines[start:end] whose text starts with
+    `title`, at any heading level, or None. The level is not checked: agents nest the
+    block under their own headings, and what matters is that the heading is there."""
     pattern = re.compile(r"^#{1,6}\s*" + re.escape(title))
-    for i in range(start, len(lines)):
+    for i in range(start, len(lines) if end is None else end):
         if pattern.match(lines[i]):
             return i
     return None
+
+
+def _heading_level(line):
+    return len(re.match(r"^(#{1,6})", line).group(1))
+
+
+def _section_boundary(lines, start, level):
+    """Index of the first heading after `start` of `level` or higher (fewer `#`), or
+    len(lines). A later section of the agent's output, such as Departures or Methods,
+    is not part of the provenance block, whatever headings it contains."""
+    for i in range(start + 1, len(lines)):
+        if HEADING.match(lines[i]) and _heading_level(lines[i]) <= level:
+            return i
+    return len(lines)
 
 
 def _section_end(lines, start, level2):
@@ -193,7 +210,13 @@ def split_block(text):
     if top is None and l1 is None:
         return False, None, None, None, text
     first = top if top is not None else l1
-    l2 = _heading_line(lines, LEVEL2_HEADING.lstrip("# "), (l1 if l1 is not None else first) + 1)
+    # Level 2 is searched only inside the provenance block. Its boundary is the next
+    # heading above Level 1's own level (or, with no Level 1, above the block heading's).
+    anchor = l1 if l1 is not None else first
+    block_level = max(_heading_level(lines[anchor]) - 1, 1) if l1 is not None else \
+        _heading_level(lines[first])
+    bound = _section_boundary(lines, anchor, block_level)
+    l2 = _heading_line(lines, LEVEL2_HEADING.lstrip("# "), anchor + 1, bound)
 
     level1 = level2 = None
     end = first + 1
