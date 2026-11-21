@@ -17,6 +17,9 @@
     bibliographic detail is added from memory.
   * With no method origin to cite, the Level 2 heading is left out, not
     written with "None" under it.
+  * The rule to reproduce the template's headings exactly no longer lists the
+    Level 2 heading unconditionally, and the template marks it as conditional,
+    so the two rules agree.
   * The Publication DOI line is omitted when `protocol_citation` equals either
     the Repository DOI or the Protocol DOI, as step 5.1 already said. The
     template named only the Repository DOI.

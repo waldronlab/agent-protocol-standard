@@ -31,10 +31,32 @@ def test_protocol_runner_examples_cite_no_literal_doi():
     assert not re.findall(r"\b10\.\d{4,9}/[^\s`\"')\]]+", body)
 
 
+def _template_lines():
+    _, body = read_skill("protocol-runner")
+    fenced = re.search(r"```markdown\n(.*?)```", body, re.DOTALL)
+    assert fenced and "## Method Provenance" in fenced.group(1), "provenance template not found"
+    return [ln.strip() for ln in fenced.group(1).splitlines() if ln.strip()]
+
+
+# The checks below read the skill's wording. They cannot show what an agent does with it;
+# that was measured by running the skill, and is checked by scripts/check_citations.py.
+
 def test_protocol_runner_template_omits_a_duplicate_publication_doi():
     # Step 5.1: a protocol_citation equal to artifact_doi or collection_doi is a first
     # definition, and the same DOI must not be cited twice. The template must say so for
     # both, so an agent following only the template cannot repeat either.
+    line = next(ln for ln in _template_lines() if ln.startswith("Publication DOI:"))
+    assert re.search(r"omit this line when it equals the Repository DOI or the Protocol DOI", line)
+
+
+def test_protocol_runner_level2_heading_is_conditional_everywhere():
+    # An unconditional "reproduce the Level 2 heading exactly" next to "omit it when there
+    # is no method origin" lets an agent write an empty Level 2 section, which #62 case 2
+    # forbids. Every place the heading is required must say when.
     _, body = read_skill("protocol-runner")
-    line = next(ln for ln in body.splitlines() if ln.strip().startswith("Publication DOI:"))
-    assert "Repository DOI" in line and "Protocol DOI" in line
+    exact = next(ln for ln in body.splitlines() if "Reproduce the template's headings" in ln)
+    assert re.search(r"Level 2\)`[^.]*\bonly\b", exact), exact
+    lines = _template_lines()
+    heading = next(i for i, ln in enumerate(lines) if ln.startswith("### Primary Literature"))
+    note = lines[heading - 1]
+    assert "only when" in note and "method_origin_citation" in note and "Otherwise" in note, note

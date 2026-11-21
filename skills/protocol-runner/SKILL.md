@@ -82,7 +82,7 @@ silent substitution this skill is meant to prevent:
 2. **Important**: Before executing any code, emit the full Method Provenance block using the following format, adapted for each protocol in the chain. "Before" is about order, not only about where it appears in the final reply:
    - Write the block as a message, **before the first tool call that reads, transforms, or writes the user's data**. Fetching the registry, indices, and protocol files may come first; anything that touches the data may not.
    - Where nothing you write reaches the user until a single final report, as when you run as a sub-agent, also write the block to `method_provenance.md` beside the outputs before that first data step, and put it first in the final report.
-   - Reproduce the template's headings and field labels exactly (`## Method Provenance`, `### Protocol Citation (Level 1)`, `### Primary Literature to Cite (Level 2)`, and each `Label:` line), so a reader or a script can find each field. Citations listed in another format do not satisfy this step.
+   - Reproduce the template's headings and field labels exactly (`## Method Provenance`, `### Protocol Citation (Level 1)`, and each `Label:` line, plus `### Primary Literature to Cite (Level 2)` only where the next point says it applies), so a reader or a script can find each field. Citations listed in another format do not satisfy this step.
    - Where no protocol in the chain carries a `method_origin_citation`, leave the Level 2 heading out altogether. A `### Primary Literature to Cite (Level 2)` heading with "None" or "omitted" under it is still a Level 2 section; say in a sentence outside the block that none applies.
    - Take every value from the protocol's frontmatter and the index. Do not add author names, years, or other bibliographic detail from memory; give the DOI, which is what the reader resolves.
 
@@ -98,6 +98,7 @@ silent substitution this skill is meant to prevent:
    Trust tier: [trust_tier]
    License: [license]
 
+   [Include the Level 2 heading and the list below it only when a protocol in the chain carries a `method_origin_citation`. Otherwise leave out both: do not write the heading with "None" under it.]
    ### Primary Literature to Cite (Level 2)
    This protocol implements methods from:
    - [The method's origin (DOI/PMID) from `method_origin_citation`, where the protocol carries one. Omit this section entirely when no protocol in the chain does: a protocol that originates no method has no primary literature to attribute, and inventing one is the failure this block exists to prevent]
