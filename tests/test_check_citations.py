@@ -352,6 +352,48 @@ def test_resolve_covers_the_whole_output():
     assert {"10.1000/example", "10.1000/example-procedure", "10.5555/elsewhere"} <= set(seen)
 
 
+# --- From the second review of the PR -------------------------------------------
+
+def test_malformed_frontmatter_is_a_contract_error(tmp_path):
+    bad = tmp_path / "bad-protocol"
+    bad.mkdir()
+    (bad / "protocol.md").write_text("---\nname: [unclosed\n---\n# x\n")
+    out = tmp_path / "out.md"
+    out.write_text(block(BASIC_L1, "- 10.1000/example"))
+    assert cc.main([str(bad), str(out)]) == 2
+    (bad / "protocol.md").write_bytes(b"---\nname: \xff\xfe\n---\n")
+    assert cc.main([str(bad), str(out)]) == 2
+
+
+def test_malformed_dependency_frontmatter_is_a_contract_error(tmp_path):
+    import shutil
+    shutil.copytree(COMPOSITE_DIR, tmp_path / "protocols")
+    (tmp_path / "protocols" / "example-atomic" / "protocol.md").write_text("---\n: : :\n  - [\n---\n")
+    out = tmp_path / "out.md"
+    out.write_text(block(COMPOSITE_L1, "- 10.1000/example"))
+    assert cc.main([str(tmp_path / "protocols" / "example-composite"), str(out),
+                    "--protocols-dir", str(tmp_path / "protocols")]) == 2
+
+
+def test_level2_heading_in_a_later_section_is_not_the_blocks():
+    later = ("\n## Departures\nNone.\n\n### Primary Literature to Cite (Level 2)\n- 10.1000/example\n")
+    text = block(BASIC_L1) + later
+    assert "level2_heading" in failed(BASIC, text)
+
+
+def test_level2_after_a_nested_block_still_found():
+    # The block nested under the agent's own heading, with its sections one level down.
+    text = ("### Method Provenance (also saved to out/)\n\n"
+            "#### Protocol Citation (Level 1)\n" + BASIC_L1 + "\n\n"
+            "#### Primary Literature to Cite (Level 2)\n- 10.1000/example\n\n## Results\nDone.\n")
+    assert failed(BASIC, text) == set()
+
+
+def test_level2_heading_in_methods_does_not_count_when_no_origin():
+    text = block(SELF_L1) + "\n## Draft Methods Section\n### Primary Literature to Cite (Level 2)\n- 10.9999/x\n"
+    assert "level2_absent" not in failed(SELF_CITED, text)
+
+
 def test_exit_codes(tmp_path, capsys):
     good = tmp_path / "good.md"
     good.write_text(block(BASIC_L1, "- 10.1000/example"))
