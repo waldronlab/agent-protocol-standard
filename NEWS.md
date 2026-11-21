@@ -2,6 +2,23 @@
 
 ## SIGNIFICANT USER-VISIBLE CHANGES
 
+* New `scripts/check_citations.py` checks the citations an agent gave when it
+  ran a protocol, against the protocol's frontmatter. It reads the Method
+  Provenance block in the format `protocol-runner` defines and reports, check
+  by check:
+
+  * whether the block and its Level 1 and Level 2 headings are present;
+  * whether Level 1 names the right protocol, version, and DOIs, and leaves
+    out the Publication DOI for a first definition;
+  * whether Level 2 lists exactly the method origin citations, including a
+    composite's constituents, with no Level 1 citation moved into it;
+  * any DOI or PMID the protocol does not carry, in the block or elsewhere in
+    the output.
+
+  It exits 0 on pass, 1 on fail and 2 when it cannot run, as
+  `check_test_result.py` does. It does not check when the block was written,
+  which only the transcript shows, and it does not resolve DOIs.
+
 * The executor of a protocol's tests is isolated from the checker (ADR 0019,
   #59). `check_test_result.py` 0.3.0 and the `test-protocol` skill 0.3.0:
 
