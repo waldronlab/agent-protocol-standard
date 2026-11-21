@@ -2,6 +2,32 @@
 
 ## SIGNIFICANT USER-VISIBLE CHANGES
 
+* `protocol-runner` 2.2.0 tightens when and how citations are given, after
+  test runs in which they were skipped, late, or reformatted:
+
+  * Its `description` now matches ordinary analysis requests, such as
+    filtering rare taxa, so the skill is used even when the user does not
+    mention protocols. Before, only requests naming protocols triggered it,
+    and Methods text was drafted with no citation at all.
+  * The Method Provenance block must be emitted before the first tool call
+    that touches the user's data, and a sub-agent also writes it to
+    `method_provenance.md`. Every run that used the skill gave it only
+    after execution.
+  * The template's headings and labels are reproduced exactly, and no
+    bibliographic detail is added from memory.
+  * With no method origin to cite, the Level 2 heading is left out, not
+    written with "None" under it.
+  * Where no protocol matches, or the registry cannot be reached, the agent
+    says so and carries on without a protocol: no Provenance block, and no
+    DOI given from memory. An unreachable registry no longer stops an
+    ordinary analysis request.
+  * The Draft Methods Section cites only DOIs and PMIDs from the frontmatter
+    of a protocol in the chain (#62). The software example citing MetaPhlAn by
+    a DOI no frontmatter carries is replaced.
+  * The skill's version is stated in its body as well as its frontmatter,
+    because agent software can strip frontmatter on load, leaving the Skill
+    Execution Record without a version.
+
 * The executor of a protocol's tests is isolated from the checker (ADR 0019,
   #59). `check_test_result.py` 0.3.0 and the `test-protocol` skill 0.3.0:
 
