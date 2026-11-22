@@ -29,13 +29,22 @@ frontmatter, following the block format in skills/protocol-runner/SKILL.md:
 A check that does not apply, such as Methods checks on output with no Methods
 section, or resolution without --resolve, is reported as `skip`. A run that
 executed the protocol must have a Methods section: pass --require-methods to
-make its absence a failure.
+make its absence a failure, or read exit status 3.
 
 Known limit: in Level 2, a list item that mentions a Level 1 DOI only to say it
 is not a method origin is still read as citing it. Read the flagged line.
 
-It prints a YAML report and exits 0 if no check failed, 1 if any failed, and 2
-if it could not run (for example, a missing protocol or dependency).
+It prints a YAML report and sets the exit status so a caller can tell the outcomes
+apart without parsing it:
+
+    0   every check passed, and the output has a Draft Methods Section
+    1   a check failed
+    2   it could not run (a missing protocol, malformed frontmatter, unreadable output)
+    3   no check failed, but the output has no Draft Methods Section, so the Methods
+        checks were skipped (the report says `methods_section: missing`)
+
+A failure outranks a missing Methods section: output with both exits 1. With
+--require-methods a missing Methods section is itself a failure (exit 1).
 
 It checks what was written, not when. Whether the block came before the agent
 touched the data can only be read from the agent's transcript.
@@ -50,7 +59,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from validate_protocol import extract_frontmatter  # noqa: E402
 
 CHECKER_NAME = "check_citations.py"
-CHECKER_VERSION = "0.4.0"
+CHECKER_VERSION = "0.5.0"
+
+# Exit status 3: nothing failed, but there is no Draft Methods Section to check.
+EXIT_METHODS_MISSING = 3
 
 # Square brackets are excluded so a Markdown link, [10.x/y](https://doi.org/10.x/y),
 # reads as two mentions of one DOI, not as one long unknown identifier.
@@ -120,14 +132,15 @@ def validate_frontmatter(fm, path):
     for key in STRING_FIELDS:
         if fm.get(key) is not None and not isinstance(fm[key], str):
             raise ContractError(f"{path}: `{key}` must be a string, found {fm[key]!r}")
-    if fm.get("version") is None or isinstance(fm["version"], (dict, list, bool)):
-        raise ContractError(f"{path}: `version` is missing or not a version string")
+    if not isinstance(fm.get("version"), str):
+        raise ContractError(f"{path}: `version` must be a string such as 1.0.0, "
+                            f"found {fm.get('version')!r}")
     used = fm.get("protocols_used")
     if used is not None and not isinstance(used, list):
         raise ContractError(f"{path}: `protocols_used` must be a list")
     for entry in used or []:
         if not isinstance(entry, dict) or not isinstance(entry.get("name"), str) \
-                or entry.get("version") is None or isinstance(entry["version"], (dict, list, bool)):
+                or not isinstance(entry.get("version"), str):
             raise ContractError(
                 f"{path}: each `protocols_used` entry needs a `name` and a `version`, found {entry!r}")
 
@@ -144,6 +157,11 @@ def resolve_dependencies(fm, protocols_dir):
             raise ContractError(
                 f"{fm['name']} pins {dep['name']} {dep.get('version')}, "
                 f"but {protocols_dir} holds {dep_fm.get('version')}")
+        if dep_fm.get("protocols_used"):
+            raise ContractError(
+                f"{dep['name']} has dependencies of its own. The runner handles one level and "
+                f"stops when a dependency has more (protocol-runner step 4.5), so there is no "
+                f"chain to check the citations of.")
         deps.append(dep_fm)
     return deps
 
@@ -451,7 +469,7 @@ def check(protocol_dir, output_text, trust_tier=None, protocols_dir=None, resolv
                        "no citation the protocol does not carry" if not extra else
                        f"not carried by the protocol: {', '.join(extra)}")
                 own = fm.get("method_origin_citation")
-                if fm.get("type") == "composite" and own:
+                if (fm.get("type") == "composite" or deps) and own:
                     own = normalize(own)
                     lines = [ln for ln in l2.split("\n") if own in find_identifiers(ln)]
                     labelled = any(re.search(r"compos", ln, re.IGNORECASE) for ln in lines)
@@ -562,16 +580,23 @@ def main(argv):
         print(f"error: {e}", file=sys.stderr)
         return 2
     failed = [r for r in results if r["result"] == "fail"]
+    # The Methods checks are skipped only when the output has no Draft Methods Section
+    # (or one that says it was not written); with --require-methods they fail instead.
+    methods_missing = any(r["check"] == "methods_attribution" and r["result"] != "pass"
+                          and r["detail"].startswith("no Draft Methods Section") for r in results)
     report = {
         "checker": f"{CHECKER_NAME} {CHECKER_VERSION}",
         "protocol": fm["name"],
         "version": str(fm["version"]),
         "output": str(output),
         "result": "fail" if failed else "pass",
+        "methods_section": "missing" if methods_missing else "present",
         "checks": results,
     }
     yaml.safe_dump(report, sys.stdout, sort_keys=False, allow_unicode=True, width=100)
-    return 1 if failed else 0
+    if failed:
+        return 1
+    return EXIT_METHODS_MISSING if methods_missing else 0
 
 
 if __name__ == "__main__":

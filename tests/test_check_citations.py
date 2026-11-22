@@ -405,6 +405,9 @@ def test_level2_heading_in_methods_does_not_count_when_no_origin():
     "name: x\nversion: 1.0.0\ncollection_doi: 12345\n",
     "name: x\nversion: 1.0.0\nmethod_origin_citation: [10.1/a]\n",
     "name: x\nversion: [1]\n",
+    "name: x\nversion: 1.0\n",                                 # a float, not "1.0"
+    "name: x\nversion: 2\n",
+    "name: x\nversion: 1.0.0\nprotocols_used:\n  - {name: y, version: 1.0}\n",
     "name: x\nversion: 1.0.0\nlicense: {a: b}\n",
 ])
 def test_unusable_frontmatter_shapes_are_contract_errors(tmp_path, frontmatter):
@@ -437,11 +440,69 @@ def test_repository_doi_line_rejected_when_there_is_no_collection_doi():
     assert "level1_repository_doi" not in failed(BASIC, block(none_line, "- 10.1000/example"))
 
 
+# --- From the fourth review of the PR ---------------------------------------------
+
+def test_nested_dependencies_are_refused(tmp_path):
+    import shutil
+    shutil.copytree(COMPOSITE_DIR, tmp_path / "protocols")
+    atomic = tmp_path / "protocols" / "example-atomic" / "protocol.md"
+    atomic.write_text(atomic.read_text().replace(
+        "protocols_used: []", "protocols_used:\n  - {name: example-composite, repository: x/y, version: 1.0.0}"))
+    out = tmp_path / "out.md"
+    out.write_text(block(COMPOSITE_L1, "- 10.1000/example"))
+    assert cc.main([str(tmp_path / "protocols" / "example-composite"), str(out),
+                    "--protocols-dir", str(tmp_path / "protocols")]) == 2
+    with pytest.raises(cc.ContractError, match="one level"):
+        cc.check(tmp_path / "protocols" / "example-composite", block(COMPOSITE_L1),
+                 protocols_dir=str(tmp_path / "protocols"))
+
+
+def test_composite_is_inferred_from_protocols_used(tmp_path):
+    import shutil
+    shutil.copytree(COMPOSITE_DIR, tmp_path / "protocols")
+    proto = tmp_path / "protocols" / "example-composite" / "protocol.md"
+    proto.write_text(proto.read_text().replace("type: composite\n", ""))
+    assert "type:" not in proto.read_text().split("---")[1]
+    unlabelled = block(COMPOSITE_L1, "- 10.1000/example\n- 10.1000/example-pipeline")
+    assert failed(tmp_path / "protocols" / "example-composite", unlabelled,
+                  protocols_dir=str(tmp_path / "protocols")) == {"level2_composite_own_labelled"}
+
+
 def test_exit_codes(tmp_path, capsys):
-    good = tmp_path / "good.md"
-    good.write_text(block(BASIC_L1, "- 10.1000/example"))
+    with_methods = tmp_path / "with_methods.md"
+    with_methods.write_text(block(BASIC_L1, "- 10.1000/example")
+                            + methods("Rare taxa were removed (DOI: 10.1000/example).\n\n" + ATTRIBUTION))
+    no_methods = tmp_path / "no_methods.md"
+    no_methods.write_text(block(BASIC_L1, "- 10.1000/example"))
     bad = tmp_path / "bad.md"
     bad.write_text("no citations here")
-    assert cc.main([str(BASIC), str(good)]) == 0
+    assert cc.main([str(BASIC), str(with_methods)]) == 0
     assert cc.main([str(BASIC), str(bad)]) == 1
-    assert cc.main([str(tmp_path / "missing"), str(good)]) == 2
+    assert cc.main([str(tmp_path / "missing"), str(with_methods)]) == 2
+    # Levi's review of #67: a missing Methods section is told apart from a real failure.
+    assert cc.main([str(BASIC), str(no_methods)]) == 3
+    assert cc.main([str(BASIC), str(no_methods), "--require-methods"]) == 1
+
+
+def test_missing_methods_report_says_so(tmp_path, capsys):
+    out = tmp_path / "o.md"
+    out.write_text(block(BASIC_L1, "- 10.1000/example"))
+    cc.main([str(BASIC), str(out)])
+    report = __import__("yaml").safe_load(capsys.readouterr().out)
+    assert report["result"] == "pass" and report["methods_section"] == "missing"
+    out.write_text(block(BASIC_L1, "- 10.1000/example") + methods("Removed (DOI: 10.1000/example).\n\n" + ATTRIBUTION))
+    cc.main([str(BASIC), str(out)])
+    assert __import__("yaml").safe_load(capsys.readouterr().out)["methods_section"] == "present"
+
+
+def test_a_failure_outranks_a_missing_methods_section(tmp_path):
+    out = tmp_path / "o.md"
+    out.write_text(block(BASIC_L1.replace("v1.1.0", "v9.9.9"), "- 10.1000/example"))  # wrong version, no Methods
+    assert cc.main([str(BASIC), str(out)]) == 1
+
+
+def test_a_methods_section_that_says_it_was_not_written_is_missing(tmp_path):
+    out = tmp_path / "o.md"
+    out.write_text(block(BASIC_L1, "- 10.1000/example")
+                   + methods("Not produced. It is written after execution, and no execution occurred."))
+    assert cc.main([str(BASIC), str(out)]) == 3
