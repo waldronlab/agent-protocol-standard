@@ -1,3 +1,5 @@
+<!-- Keep it short: see "Writing an ADR" in README.md. Delete this comment. -->
+
 # NNNN. <Short title of solved problem and solution>
 
 - **Status:** [Proposed | Accepted | Rejected | Deprecated | Superseded by [ADR-0005](0005-example.md)]
