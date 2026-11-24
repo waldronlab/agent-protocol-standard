@@ -58,23 +58,32 @@ A run stopped before the executor finished still gets an `executor.yaml`, with `
 non-empty text, and the checker copies it into the record and prints it. The checker needs no
 other change. It already records every test without a result as `not_run`.
 
-`abandoned` does not change the exit status. The exit status reports only the tests compared, so an
-abandoned run whose compared tests all passed exits 0, as any run with `not_run` tests already
-does. Whether a run was abandoned, and how many tests were not run, is read from the record, which
-is what the archive and its index count.
+`abandoned` does not change the exit status, which depends only on the results (decision 3). An
+abandoned run with no failures has `not_run` tests and exits 3, as any incomplete run does.
+Whether a run was abandoned is read from the record, which is what the archive and its index
+count.
 
 The `test-protocol` skill gains the rule that every run started with `--shape` ends in a check.
 The checker cannot enforce it, since a run that is never checked leaves nothing for it to see.
 The rule makes discarding a run a violation rather than a permitted path.
 
-### 3. Exit status 2 has two meanings
+### 3. The exit status separates an incomplete run from a pass and from a contract error
 
-The checker writes `run.yaml` and exits 2 when no test has a result ("Nothing was compared"). The
-skill said exit 2 means no record was written, and an abandoned run hits the other case every
-time. The exit
-status is kept, and the wording changes in the standard, the skill and the checker: exit 2 is
-either a contract error, with no record, or a run in which nothing was compared, with one. The
-checker's message for the second says the record was written.
+| Exit | Meaning | `run.yaml` written? |
+|---|---|---|
+| 0 | every test ran and passed | yes |
+| 1 | at least one test failed | yes |
+| 2 | the checker could not run (contract error) | no |
+| 3 | no test failed, but at least one is `not_run`, including when nothing was compared | yes |
+
+In 0.3.0, a run with passes and `not_run` tests exited 0, the same as a complete pass, and a run
+in which nothing was compared exited 2, the same as a contract error. A caller reading only the
+exit status could not tell a stopped run from a complete one, and told the two meanings of 2
+apart only by whether `run.yaml` existed. Each code now has one meaning.
+
+The code depends only on the results, so two runs with the same results exit the same way
+whatever the reason tests were not run. `check_citations.py` (#67) uses 3 for the same kind of
+outcome: nothing failed, but something expected is missing.
 
 ### 4. Settings that decide the outcome are recommended keys first
 
@@ -118,11 +127,12 @@ at 1: keys are added, and none changes meaning.
 - **Hash paths relative to `results/`, without the prefix.** Equivalent in strength. The prefix
   matches how the archive keeps a run, `results/` beside `run.yaml`, and how `source_digest`
   names its files relative to the protocol directory (`tests/...`).
-- **A nonzero exit status for an abandoned run.** Rejected: the exit status reports comparisons,
-  and a run with `not_run` tests already exits 0 when the rest pass. Making `abandoned` change it
-  would give the same results two exit statuses depending on why tests were not run.
-- **A new exit status for "nothing compared".** Rejected: the record's presence already tells
-  the two cases apart, and a new status would change what callers of 0.3.0 see.
+- **An exit status of its own for an abandoned run.** Rejected: it would give the same results
+  two exit statuses depending on why tests were not run.
+- **Keep 0.3.0's codes and reword exit 2 as having two meanings.** The first draft of this ADR.
+  Rejected in review: callers would have to read `run.yaml` to see that a run is incomplete, or
+  check whether it exists to tell "nothing compared" from a contract error. Few callers of 0.3.0
+  exist, so changing what they see costs little.
 
 ## Consequences
 

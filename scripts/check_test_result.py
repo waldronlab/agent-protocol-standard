@@ -10,11 +10,11 @@
 
     check_test_result.py TESTS_DIR RESULTS_DIR [--test NAME]
         Compare each test's result.yaml against the test, write
-        RESULTS_DIR/run.yaml, and exit 0 if every compared test passed, 1 if
-        any failed. Exit 2 means either a contract error, with no record
-        written, or a run in which nothing was compared, with one. A run is
-        checked once: a results directory that already holds run.yaml is
-        refused.
+        RESULTS_DIR/run.yaml, and exit 0 if every test ran and passed, 1 if
+        any failed, and 3 if none failed but at least one was not run,
+        including when nothing was compared. Exit 2 is a contract error, and
+        no record is written. A run is checked once: a results directory that
+        already holds run.yaml is refused.
 
 The contract is the "Tests" section of PROTOCOL_STANDARD.md. This script is
 the only thing that decides pass or fail.
@@ -837,10 +837,11 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
         print(f"Abandoned: {executor['abandoned'].strip()}")
     if n_fail:
         return 1
-    if n_pass == 0:
-        # Exit 2 with a record, unlike a contract error: the record is still the run's.
-        print("Nothing was compared. The record was written.")
-        return 2
+    if n_skip:
+        # Incomplete, not failed: exit 3, whatever the reason tests were not run.
+        if n_pass == 0:
+            print("Nothing was compared.")
+        return 3
     return 0
 
 

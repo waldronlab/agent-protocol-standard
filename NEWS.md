@@ -26,8 +26,9 @@
   * `abandoned: <reason>` in `executor.yaml` marks a run stopped before the
     executor finished. Such a run is still checked, and the skill requires that
     every run started with `--shape` is.
-  * Exit status 2 means either a contract error, with no record, or a run in
-    which nothing was compared, with one.
+  * Exit status 3 means no test failed but at least one was not run, including
+    when nothing was compared. Such runs used to exit 0, or 2 when nothing was
+    compared. Exit 2 now means only a contract error, with no record.
   * `harness_config`, `model_digest`, `quantization` and `isolation_method` are
     recommended additional keys under `executor`.
   * The skill reports the executor's reply but treats the checker's report as

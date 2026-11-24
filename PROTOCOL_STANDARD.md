@@ -446,9 +446,9 @@ blind execution. A failed run is reported as it stands; another attempt is a new
 `--shape` in new directories. Every run that `--shape` starts ends in a check, including one stopped
 before the executor finished, which records why in `abandoned` (see the run record). Otherwise an
 invoker could discard runs that look bad and check only the good ones. The checker exits 0 when
-every compared test passed and 1 when any failed. Exit 2 has two meanings: a contract error, which
-writes no record, so it can be corrected and the run checked; or a run in which nothing was
-compared, which writes one. Its comparison rules:
+every test ran and passed, 1 when any failed, and 3 when none failed but at least one was not run,
+including when nothing was compared; each writes the record. Exit 2 is a contract error, which
+writes no record, so it can be corrected and the run checked. Its comparison rules:
 
 *   Numbers match within `numeric_tolerance`. Strings, booleans and nulls match exactly. Lists match
     element by element, in order. At the top level of `result.yaml`, a key missing from the result
@@ -530,8 +530,8 @@ OS sandbox around a tool loop, or a virtual machine all qualify, and say which i
 executor finished, for example a broken harness or a time limit. When present it must be
 non-empty text, and the checker copies it into the record. An abandoned run is checked like any
 other, and every test it has no result for is `not_run`. It does not change the exit status, which
-reports only the tests compared: an abandoned run whose compared tests all passed exits 0, as any
-run with `not_run` tests does. Whether a run was abandoned is read from the record. Without the key, a run whose harness
+depends only on the results: an abandoned run with no failures exits 3, as any run with `not_run`
+tests does. Whether a run was abandoned is read from the record. Without the key, a run whose harness
 broke and a run whose executor wrote nothing look the same.
 
 `results_digest` is a sha256 over the results the checker compared, taken at check time and

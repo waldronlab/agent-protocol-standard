@@ -327,7 +327,7 @@ def test_check_not_run_is_neither(repo, tmp_path, capsys):
     passing_results(results)
     shutil.rmtree(results / "orientation")
     executor(results)
-    assert checker.main([str(tests), str(results)]) == 0
+    assert checker.main([str(tests), str(results)]) == 3            # incomplete, not a pass
     record = yaml.safe_load((results / "run.yaml").read_text())
     assert [t["result"] for t in record["tests"]] == ["pass", "not_run"]
 
@@ -741,7 +741,7 @@ def test_bundle_ignores_results_written_beside_the_record(repo, tmp_path, capsys
     shape(repo, results, capsys, "--bundle", str(bundle))
     passing_results(results)                                        # the wrong place
     executor(results)
-    assert checker.main([str(tests), str(results)]) == 2            # nothing compared
+    assert checker.main([str(tests), str(results)]) == 3            # nothing compared
     assert "Nothing was compared." in capsys.readouterr().out
 
 
@@ -926,8 +926,8 @@ def test_an_abandoned_run_is_checked_and_recorded(repo, tmp_path, capsys):
     tests = repo / "protocols/example-protocol/tests"
     shape(repo, results, capsys, "--bundle", str(bundle))
     executor(results, abandoned="the harness stopped returning tool results")
-    # nothing compared: exit 2, but with a record, unlike a contract error
-    assert checker.main([str(tests), str(results)]) == 2
+    # nothing compared: exit 3, with a record, unlike a contract error
+    assert checker.main([str(tests), str(results)]) == 3
     out = capsys.readouterr().out
     assert "Abandoned: the harness stopped returning tool results" in out
     assert "Nothing was compared." in out
@@ -944,7 +944,7 @@ def test_an_abandoned_run_compares_what_was_written(repo, tmp_path, capsys):
     passing_results(bundle / "results")
     shutil.rmtree(bundle / "results/orientation")
     executor(results, abandoned="stopped by the invoker after 30 minutes")
-    assert checker.main([str(tests), str(results)]) == 0
+    assert checker.main([str(tests), str(results)]) == 3
     record = yaml.safe_load((results / "run.yaml").read_text())
     assert [t["result"] for t in record["tests"]] == ["pass", "not_run"]
 

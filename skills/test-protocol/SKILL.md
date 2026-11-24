@@ -172,11 +172,11 @@ python3 scripts/check_test_result.py <protocol>/tests <results directory>
 The checker reads the results from the bundle, compares every test that has a result
 subdirectory, prints each as PASS, FAIL, or NOT_RUN with the failing comparisons, and writes
 `run.yaml` into the results directory, with `results_digest`, a digest of the results it
-compared. Exit status 0 means every compared test passed, and 1 means at least one failed.
+compared. Exit status 0 means every test ran and passed, 1 means at least one failed, and 3
+means none failed but at least one was not run, including when nothing was compared, as is usual
+for an abandoned run. Each writes the record, which is reported like any other.
 
-Exit status 2 has two meanings. If the checker printed "Nothing was compared", no test had a
-result, and the record was written: it is the run's record, reported like any other. This is
-usual for an abandoned run. Otherwise the contract was not met and no record was written:
+Exit status 2 means the contract was not met, and no record was written:
 
 - A problem in `executor.yaml`, such as a missing field: correct it, using only the times you
   recorded from the clock, and check again.
