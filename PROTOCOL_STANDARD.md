@@ -479,6 +479,7 @@ protocol_commit: 844ce92        # commit the protocol and tests were read at, fr
 uncommitted: false              # true, with no commit, if the checkout was dirty
 source_digest: sha256:9f2c...   # digest of protocol.md and tests/, from source.yaml
 results_digest: sha256:41d7...  # digest of the results the executor left
+unreadable_results: []          # only present when non-empty: files hashed as <unreadable>
 started: 2026-10-18T14:02:11Z   # UTC timestamps, from the executor
 finished: 2026-10-18T14:09:40Z
 shaped: 2026-10-18T14:02:05Z    # UTC timestamps, from the checker: when --shape ran,
@@ -543,7 +544,10 @@ and the checker, and not the checker's download cache. Each path is written as
 `results/<path under that directory>`, so a copy of the results kept anywhere as `results/` can be
 shown to be the one that was checked. Symlinks, in either case, are neither followed nor covered,
 so a copy that replaces one with the file it points to does not match. A file the checker cannot read
-is hashed as the text `<unreadable>` in place of its contents, so the record is still written. With
+is hashed as the text `<unreadable>` in place of its contents, so the record is still written, and
+its path is listed under `unreadable_results` in the record (the key is absent when none were). A copy
+of the archived tree has those files readable, so whoever recomputes the digest hashes the listed
+paths as `<unreadable>` too. With
 `--test` the digest still covers every test's results, not only the one compared. The executor's
 reply is not evidence of what it wrote: an executor can report a result for every test while
 writing none. The record and the results it digests are.
@@ -562,7 +566,7 @@ recording them under `executor` is recommended, under these names, until they ar
     `"OS sandbox: read/write bundle only, no network"`.
 
 The keys the checker writes itself, `run_record`, `protocol`, `version`, `repository`,
-`protocol_commit`, `uncommitted`, `source_digest`, `results_digest`, `shaped`, `checked`,
+`protocol_commit`, `uncommitted`, `source_digest`, `results_digest`, `unreadable_results`, `shaped`, `checked`,
 `checker`, and `tests`, are reserved: an `executor.yaml` that supplies any of them is rejected
 rather than silently overridden. `run_record` is incremented when a defined key changes meaning;
 adding a key does not change the meaning of the others.

@@ -140,7 +140,7 @@ def compute_digest(protocol_dir: Path) -> str:
     return "sha256:" + h.hexdigest()
 
 
-def compute_results_digest(results_root: Path, bundle: bool) -> str:
+def compute_results_digest(results_root: Path, bundle: bool) -> tuple:
     """sha256 over the executor's results at check time, computed as compute_digest is, with each
     path written as results/<path under results_root>, so the digest of an archived copy of
     <bundle>/results/ can be recomputed. With a bundle, every file under <bundle>/results/ counts,
@@ -149,7 +149,9 @@ def compute_results_digest(results_root: Path, bundle: bool) -> str:
     Symlinks are neither followed nor covered. Unlike in compute_digest, they are not refused:
     the executor controls this tree, and refusing would let it prevent the run's record. A file
     that cannot be read (permissions, or removed after it was listed) is hashed as UNREADABLE_MARKER
-    in place of its contents, for the same reason; the digest stays deterministic."""
+    in place of its contents, for the same reason; the digest stays deterministic. Returns the
+    digest and the sorted results/-relative paths hashed that way, which the run record keeps so
+    that a copy of the archived tree, where those files are readable, can still be verified."""
     h = hashlib.sha256()
     files = []
     for p in results_root.rglob("*"):
@@ -160,6 +162,7 @@ def compute_results_digest(results_root: Path, bundle: bool) -> str:
             continue
         if p.is_file():
             files.append(rel.as_posix())
+    unreadable = []
     for rel in sorted(files):
         h.update(f"{BUNDLE_RESULTS}/{rel}".encode("utf-8"))
         h.update(b"\0")
@@ -167,9 +170,10 @@ def compute_results_digest(results_root: Path, bundle: bool) -> str:
             data = (results_root / rel).read_bytes()
         except OSError:
             data = UNREADABLE_MARKER
+            unreadable.append(f"{BUNDLE_RESULTS}/{rel}")
         h.update(data)
         h.update(b"\0")
-    return "sha256:" + h.hexdigest()
+    return "sha256:" + h.hexdigest(), unreadable
 
 
 def _git(protocol_dir: Path, *args):
@@ -717,7 +721,7 @@ def check_timestamps(executor: dict, source: dict, checked: datetime):
 
 
 def build_run_record(fm: dict, source: dict, executor: dict, tests: list, checked: datetime,
-                     results_digest: str) -> dict:
+                     results_digest: str, unreadable: list = ()) -> dict:
     record = {
         "run_record": RUN_RECORD_VERSION,
         "protocol": fm.get("name"),
@@ -727,6 +731,7 @@ def build_run_record(fm: dict, source: dict, executor: dict, tests: list, checke
         "uncommitted": bool(source.get("uncommitted")),
         "source_digest": source.get("source_digest"),
         "results_digest": results_digest,
+        **({"unreadable_results": list(unreadable)} if unreadable else {}),
         "started": _stamp(executor["started"]),
         "finished": _stamp(executor["finished"]),
         "shaped": _stamp(source["taken"]),
@@ -809,7 +814,7 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
         if not results_root.is_dir():
             raise ContractError(f"{results_root} does not exist; the executor writes its results there")
     # Before comparing, so the digest is of what the executor left, not of anything the checker wrote.
-    results_digest = compute_results_digest(results_root, bundle=bool(source.get("bundle")))
+    results_digest, unreadable = compute_results_digest(results_root, bundle=bool(source.get("bundle")))
 
     entries = []
     for test_dir, case in cases:
@@ -828,7 +833,7 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
             continue
         entries.append(check_one(case, test_dir, result_dir, results_dir))
 
-    record = build_run_record(fm, source, executor, entries, checked, results_digest)
+    record = build_run_record(fm, source, executor, entries, checked, results_digest, unreadable)
     (results_dir / RUN_FILE).write_text(yaml.safe_dump(record, sort_keys=False, allow_unicode=True),
                                         encoding="utf-8")
 

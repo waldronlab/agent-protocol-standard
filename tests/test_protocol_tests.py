@@ -925,10 +925,12 @@ def test_results_digest_hashes_an_unreadable_file_rather_than_refusing_the_run(r
             pytest.skip("permissions are not enforced here (running as root)")
         executor(results)
         assert checker.main([str(tests), str(results)]) == 0
-        digest = yaml.safe_load((results / "run.yaml").read_text())["results_digest"]
+        record = yaml.safe_load((results / "run.yaml").read_text())
+        digest = record["results_digest"]
     finally:
         locked.chmod(0o644)
     # the same tree with the marker as the file's contents
+    assert record["unreadable_results"] == ["results/locked.txt"]
     locked.write_bytes(checker.UNREADABLE_MARKER)
     assert digest == archived_digest(bundle / "results")
 
