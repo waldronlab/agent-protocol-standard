@@ -10,9 +10,11 @@
 
     check_test_result.py TESTS_DIR RESULTS_DIR [--test NAME]
         Compare each test's result.yaml against the test, write
-        RESULTS_DIR/run.yaml, and exit 0 if every compared test passed, 1 if
-        any failed, 2 if the contract was not met. A run is checked once:
-        a results directory that already holds run.yaml is refused.
+        RESULTS_DIR/run.yaml, and exit 0 if every test ran and passed, 1 if
+        any failed, and 3 if none failed but at least one was not run,
+        including when nothing was compared. Exit 2 is a contract error, and
+        no record is written. A run is checked once: a results directory that
+        already holds run.yaml is refused.
 
 The contract is the "Tests" section of PROTOCOL_STANDARD.md. This script is
 the only thing that decides pass or fail.
@@ -40,7 +42,7 @@ from validate_protocol import load_test_case, extract_frontmatter  # noqa: E402
 from repo_utils import parse_repository_url  # noqa: E402
 
 CHECKER_NAME = "check_test_result.py"
-CHECKER_VERSION = "0.3.0"
+CHECKER_VERSION = "0.4.0"
 RUN_RECORD_VERSION = 1
 SOURCE_FILE = "source.yaml"
 EXECUTOR_FILE = "executor.yaml"
@@ -133,6 +135,32 @@ def compute_digest(protocol_dir: Path) -> str:
         h.update(p.relative_to(protocol_dir).as_posix().encode("utf-8"))
         h.update(b"\0")
         h.update(p.read_bytes())
+        h.update(b"\0")
+    return "sha256:" + h.hexdigest()
+
+
+def compute_results_digest(results_root: Path, bundle: bool) -> str:
+    """sha256 over the executor's results at check time, computed as compute_digest is, with each
+    path written as results/<path under results_root>, so the digest of an archived copy of
+    <bundle>/results/ can be recomputed. With a bundle, every file under <bundle>/results/ counts,
+    extras included. Without one, only the subdirectories of the results directory count: its
+    top-level files are the invoker's and the checker's, and .remote/ is the checker's cache.
+    Symlinks are neither followed nor covered. Unlike in compute_digest, they are not refused:
+    the executor controls this tree, and refusing would let it prevent the run's record."""
+    h = hashlib.sha256()
+    files = []
+    for p in results_root.rglob("*"):
+        rel = p.relative_to(results_root)
+        if not bundle and (len(rel.parts) == 1 or rel.parts[0] == CACHE_DIR):
+            continue
+        if any(q.is_symlink() for q in [p, *p.parents][:len(rel.parts)]):
+            continue
+        if p.is_file():
+            files.append(rel.as_posix())
+    for rel in sorted(files):
+        h.update(f"{BUNDLE_RESULTS}/{rel}".encode("utf-8"))
+        h.update(b"\0")
+        h.update((results_root / rel).read_bytes())
         h.update(b"\0")
     return "sha256:" + h.hexdigest()
 
@@ -653,6 +681,8 @@ def load_executor(results_dir: Path) -> dict:
     for k in ("started", "finished"):
         if not _is_timestamp(data.get(k)):
             raise ContractError(f"{path} needs '{k}' as an ISO 8601 timestamp with a timezone, such as 2026-10-18T14:02:11Z")
+    if "abandoned" in data and not (isinstance(data["abandoned"], str) and data["abandoned"].strip()):
+        raise ContractError(f"{path}: 'abandoned', when present, is the reason the run was stopped, as text")
     return data
 
 
@@ -679,7 +709,8 @@ def check_timestamps(executor: dict, source: dict, checked: datetime):
                             "take timestamps from the clock, never write them by hand")
 
 
-def build_run_record(fm: dict, source: dict, executor: dict, tests: list, checked: datetime) -> dict:
+def build_run_record(fm: dict, source: dict, executor: dict, tests: list, checked: datetime,
+                     results_digest: str) -> dict:
     record = {
         "run_record": RUN_RECORD_VERSION,
         "protocol": fm.get("name"),
@@ -688,6 +719,7 @@ def build_run_record(fm: dict, source: dict, executor: dict, tests: list, checke
         "protocol_commit": source.get("protocol_commit"),
         "uncommitted": bool(source.get("uncommitted")),
         "source_digest": source.get("source_digest"),
+        "results_digest": results_digest,
         "started": _stamp(executor["started"]),
         "finished": _stamp(executor["finished"]),
         "shaped": _stamp(source["taken"]),
@@ -769,6 +801,8 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
         results_root = Path(source["bundle"]) / BUNDLE_RESULTS
         if not results_root.is_dir():
             raise ContractError(f"{results_root} does not exist; the executor writes its results there")
+    # Before comparing, so the digest is of what was compared.
+    results_digest = compute_results_digest(results_root, bundle=bool(source.get("bundle")))
 
     entries = []
     for test_dir, case in cases:
@@ -787,7 +821,7 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
             continue
         entries.append(check_one(case, test_dir, result_dir, results_dir))
 
-    record = build_run_record(fm, source, executor, entries, checked)
+    record = build_run_record(fm, source, executor, entries, checked, results_digest)
     (results_dir / RUN_FILE).write_text(yaml.safe_dump(record, sort_keys=False, allow_unicode=True),
                                         encoding="utf-8")
 
@@ -799,11 +833,15 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
         for f in e.get("failures", []):
             print(f"          {f}")
     print(f"\n{n_pass} passed, {n_fail} failed, {n_skip} not run. Record: {results_dir / RUN_FILE}")
+    if "abandoned" in executor:
+        print(f"Abandoned: {executor['abandoned'].strip()}")
     if n_fail:
         return 1
-    if n_pass == 0:
-        print("Nothing was compared.")
-        return 2
+    if n_skip:
+        # Incomplete, not failed: exit 3, whatever the reason tests were not run.
+        if n_pass == 0:
+            print("Nothing was compared.")
+        return 3
     return 0
 
 

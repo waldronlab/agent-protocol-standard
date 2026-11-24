@@ -443,8 +443,12 @@ test with no result subdirectory is reported as not run, which is neither pass n
 checked **once**: the checker refuses a results directory that already holds `run.yaml`, because a
 failure message names the expected value, and a result corrected after reading one is no longer a
 blind execution. A failed run is reported as it stands; another attempt is a new run, from
-`--shape` in new directories. A contract error writes no record, so it can be corrected and the
-run checked. Its comparison rules:
+`--shape` in new directories. Every run that `--shape` starts ends in a check, including one stopped
+before the executor finished, which records why in `abandoned` (see the run record). Otherwise an
+invoker could discard runs that look bad and check only the good ones. The checker exits 0 when
+every test ran and passed, 1 when any failed, and 3 when none failed but at least one was not run,
+including when nothing was compared; each writes the record. Exit 2 is a contract error, which
+writes no record, so it can be corrected and the run checked. Its comparison rules:
 
 *   Numbers match within `numeric_tolerance`. Strings, booleans and nulls match exactly. Lists match
     element by element, in order. At the top level of `result.yaml`, a key missing from the result
@@ -474,6 +478,7 @@ repository: waldronlab/agent-protocols
 protocol_commit: 844ce92        # commit the protocol and tests were read at, from source.yaml
 uncommitted: false              # true, with no commit, if the checkout was dirty
 source_digest: sha256:9f2c...   # digest of protocol.md and tests/, from source.yaml
+results_digest: sha256:41d7...  # digest of the results the checker compared
 started: 2026-10-18T14:02:11Z   # UTC timestamps, from the executor
 finished: 2026-10-18T14:09:40Z
 shaped: 2026-10-18T14:02:05Z    # UTC timestamps, from the checker: when --shape ran,
@@ -486,10 +491,10 @@ executor:
   isolation: subagent           # subagent | container | none
   invocation:                   # how the protocol reached the agent
     kind: skill                 # skill | in-context | unguided
-    skill: test-protocol 0.3.0  # name and version, for kind: skill
+    skill: test-protocol 0.4.0  # name and version, for kind: skill
   prompt: |                     # verbatim text that started the run
     Run the tests for independent-filtering-variance.
-checker: check_test_result.py 0.3.0
+checker: check_test_result.py 0.4.0
 tests:
   - name: variance_rows
     result: pass                # pass | fail | not_run (no result subdirectory)
@@ -516,14 +521,49 @@ with the protocol text supplied in context, and a run given no protocol at all; 
 differ only there are different experiments. `isolation` says what separated the executor from
 the tests: `subagent`, a fresh agent given only the bundle; `container`, an executor that could
 reach nothing but the bundle; or `none`, an executor in the same session as whoever invoked it.
-Two runs that differ only there are different experiments too. Additional keys, at the top level
-of `executor.yaml` or under `executor`, are permitted and preserved, so a study that records
-cost, token counts, attempts, or an experimental condition adds them without a schema change.
+Two runs that differ only there are different experiments too. `container` is defined by what the
+executor could reach, not by how that was enforced: a container with only the bundle mounted, an
+OS sandbox around a tool loop, or a virtual machine all qualify, and say which in
+`isolation_method` (below).
+
+`abandoned`, at the top level of `executor.yaml`, is the reason a run was stopped before the
+executor finished, for example a broken harness or a time limit. When present it must be
+non-empty text, and the checker copies it into the record. An abandoned run is checked like any
+other, and every test it has no result for is `not_run`. It does not change the exit status, which
+depends only on the results: an abandoned run with no failures exits 3, as any run with `not_run`
+tests does. Whether a run was abandoned is read from the record. Without the key, a run whose harness
+broke and a run whose executor wrote nothing look the same.
+
+`results_digest` is a sha256 over the results the checker compared, taken at check time and
+computed as `source_digest` is: for each file, in order of its path, the path, a NUL byte, its
+contents and a NUL byte. With a bundle it covers every file under `<bundle>/results/` except symlinks,
+including files the executor left there beyond its results, and not `<bundle>/work/`. Without one it covers
+the subdirectories of the results directory, not its top-level files, which belong to the invoker
+and the checker, and not the checker's download cache. Each path is written as
+`results/<path under that directory>`, so a copy of the results kept anywhere as `results/` can be
+shown to be the one that was checked. Symlinks, in either case, are neither followed nor covered,
+so a copy that replaces one with the file it points to does not match. The executor's
+reply is not evidence of what it wrote: an executor can report a result for every test while
+writing none. The record and the results it digests are.
+
+Additional keys, at the top level of `executor.yaml` or under `executor`, are permitted and
+preserved, so a study that records cost, token counts, attempts, or an experimental condition
+adds them without a schema change. Some settings decide whether a run can finish at all, so
+recording them under `executor` is recommended, under these names, until they are defined:
+
+*   `harness_config`, a mapping of every harness setting that changes the executor's behaviour,
+    such as `context_window`, `max_output_tokens`, whether the model's reasoning is kept in its
+    context, and a `system_prompt_digest`;
+*   `model_digest`, for an open-weight model, since a tag such as `qwen3:4b` can move;
+*   `quantization`, for an open-weight model, such as `Q4_K_M`;
+*   `isolation_method`, free text saying how `isolation` was achieved, such as
+    `"OS sandbox: read/write bundle only, no network"`.
+
 The keys the checker writes itself, `run_record`, `protocol`, `version`, `repository`,
-`protocol_commit`, `uncommitted`, `source_digest`, `shaped`, `checked`, `checker`, and `tests`,
-are reserved: an `executor.yaml` that supplies any of them is rejected rather than silently
-overridden. `run_record` is incremented when a defined key changes meaning; adding a key does not
-change the meaning of the others.
+`protocol_commit`, `uncommitted`, `source_digest`, `results_digest`, `shaped`, `checked`,
+`checker`, and `tests`, are reserved: an `executor.yaml` that supplies any of them is rejected
+rather than silently overridden. `run_record` is incremented when a defined key changes meaning;
+adding a key does not change the meaning of the others.
 
 Where run records are kept is not yet defined (issue #44). Attach the record to the pull request or
 issue it is relevant to.
