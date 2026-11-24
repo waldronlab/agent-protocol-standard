@@ -23,5 +23,6 @@ This directory contains Architecture Decision Records (ADRs) for the `agent-prot
 - [0017. Conditions on Materials: Where They Live and What a Violation Means](0017-conditions-on-materials.md) — extends 0012 and 0016
 - [0018. Resolve Dependencies from the Composite, Not the Index](0018-resolve-dependencies-without-the-index.md) — amends 0004 and 0008
 - [0019. Isolate the Executor from the Checker](0019-isolate-the-executor-from-the-checker.md) — amends 0016
+- [0022. Show Every Test of a Protocol the Same Result Shape](0022-show-every-test-the-same-result-shape.md) — amends 0016 and 0019
 
 
