@@ -1,6 +1,6 @@
 # 0020. Record What Decides a Test Run's Outcome
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-18
 - **Deciders:** Levi Waldron, Otto Infield-Harm
 
