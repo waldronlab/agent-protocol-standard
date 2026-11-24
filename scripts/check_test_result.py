@@ -54,6 +54,7 @@ SHAPE_FILE = "shape.yaml"
 BUNDLE_INPUTS = "inputs"
 BUNDLE_PROTOCOLS = "protocols"
 BUNDLE_RESULTS = "results"
+UNREADABLE_MARKER = b"<unreadable>"
 
 
 class ContractError(Exception):
@@ -146,7 +147,9 @@ def compute_results_digest(results_root: Path, bundle: bool) -> str:
     extras included. Without one, only the subdirectories of the results directory count: its
     top-level files are the invoker's and the checker's, and .remote/ is the checker's cache.
     Symlinks are neither followed nor covered. Unlike in compute_digest, they are not refused:
-    the executor controls this tree, and refusing would let it prevent the run's record."""
+    the executor controls this tree, and refusing would let it prevent the run's record. A file
+    that cannot be read (permissions, or removed after it was listed) is hashed as UNREADABLE_MARKER
+    in place of its contents, for the same reason; the digest stays deterministic."""
     h = hashlib.sha256()
     files = []
     for p in results_root.rglob("*"):
@@ -160,7 +163,11 @@ def compute_results_digest(results_root: Path, bundle: bool) -> str:
     for rel in sorted(files):
         h.update(f"{BUNDLE_RESULTS}/{rel}".encode("utf-8"))
         h.update(b"\0")
-        h.update((results_root / rel).read_bytes())
+        try:
+            data = (results_root / rel).read_bytes()
+        except OSError:
+            data = UNREADABLE_MARKER
+        h.update(data)
         h.update(b"\0")
     return "sha256:" + h.hexdigest()
 
@@ -801,7 +808,7 @@ def cmd_check(tests_dir: Path, results_dir: Path, only: str = None) -> int:
         results_root = Path(source["bundle"]) / BUNDLE_RESULTS
         if not results_root.is_dir():
             raise ContractError(f"{results_root} does not exist; the executor writes its results there")
-    # Before comparing, so the digest is of what was compared.
+    # Before comparing, so the digest is of what the executor left, not of anything the checker wrote.
     results_digest = compute_results_digest(results_root, bundle=bool(source.get("bundle")))
 
     entries = []

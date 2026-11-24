@@ -478,7 +478,7 @@ repository: waldronlab/agent-protocols
 protocol_commit: 844ce92        # commit the protocol and tests were read at, from source.yaml
 uncommitted: false              # true, with no commit, if the checkout was dirty
 source_digest: sha256:9f2c...   # digest of protocol.md and tests/, from source.yaml
-results_digest: sha256:41d7...  # digest of the results the checker compared
+results_digest: sha256:41d7...  # digest of the results the executor left
 started: 2026-10-18T14:02:11Z   # UTC timestamps, from the executor
 finished: 2026-10-18T14:09:40Z
 shaped: 2026-10-18T14:02:05Z    # UTC timestamps, from the checker: when --shape ran,
@@ -534,7 +534,7 @@ depends only on the results: an abandoned run with no failures exits 3, as any r
 tests does. Whether a run was abandoned is read from the record. Without the key, a run whose harness
 broke and a run whose executor wrote nothing look the same.
 
-`results_digest` is a sha256 over the results the checker compared, taken at check time and
+`results_digest` is a sha256 over the results the executor left, taken at check time and
 computed as `source_digest` is: for each file, in order of its path, the path, a NUL byte, its
 contents and a NUL byte. With a bundle it covers every file under `<bundle>/results/` except symlinks,
 including files the executor left there beyond its results, and not `<bundle>/work/`. Without one it covers
@@ -542,7 +542,9 @@ the subdirectories of the results directory, not its top-level files, which belo
 and the checker, and not the checker's download cache. Each path is written as
 `results/<path under that directory>`, so a copy of the results kept anywhere as `results/` can be
 shown to be the one that was checked. Symlinks, in either case, are neither followed nor covered,
-so a copy that replaces one with the file it points to does not match. The executor's
+so a copy that replaces one with the file it points to does not match. A file the checker cannot read
+is hashed as the text `<unreadable>` in place of its contents, so the record is still written. With
+`--test` the digest still covers every test's results, not only the one compared. The executor's
 reply is not evidence of what it wrote: an executor can report a result for every test while
 writing none. The record and the results it digests are.
 
