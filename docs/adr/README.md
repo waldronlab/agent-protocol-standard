@@ -24,6 +24,6 @@ This directory contains Architecture Decision Records (ADRs) for the `agent-prot
 - [0018. Resolve Dependencies from the Composite, Not the Index](0018-resolve-dependencies-without-the-index.md) — amends 0004 and 0008
 - [0019. Isolate the Executor from the Checker](0019-isolate-the-executor-from-the-checker.md) — amends 0016
 - [0020. Record What Decides a Test Run's Outcome](0020-record-what-decides-a-runs-outcome.md) — amends 0019
-- [0022. Show Every Test of a Protocol the Same Result Shape](0022-show-every-test-the-same-result-shape.md) — amends 0016 and 0019
+- [0021. Show Every Test of a Protocol the Same Result Shape](0021-show-every-test-the-same-result-shape.md) — amends 0016 and 0019
 
 
