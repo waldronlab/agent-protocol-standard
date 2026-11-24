@@ -2,6 +2,16 @@
 
 This directory contains Architecture Decision Records (ADRs) for the `agent-protocol-standard` repository.
 
+## Writing an ADR
+
+Start from [template.md](template.md). An ADR records what was decided and why. Keep it short:
+
+- Formats, schemas, file layouts and algorithms go in `PROTOCOL_STANDARD.md` or the skill, not the ADR. Link to them.
+- The context summarises the issue and links to it. Don't repeat the issue's examples and tables.
+- Give each reason once. Don't repeat an argument made under another decision.
+- List an alternative only if a reader would plausibly propose it, with one line on why it was rejected.
+- Leave out drafting history, such as what an earlier draft said. It belongs in the PR.
+
 ## Index
 
 - [0001. Protocol Format and Federation Standard](0001-protocol-standard.md)

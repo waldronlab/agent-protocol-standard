@@ -21,6 +21,16 @@ jobs:
       actions: read
     uses: waldronlab/.github/.github/workflows/claude.yml@devel
     secrets: inherit
+    with:
+      review_focus: &review_focus |
+        For changes to docs/adr/, PROTOCOL_STANDARD.md and skills/*/SKILL.md, also review length
+        against "Writing an ADR" in docs/adr/README.md; for the standard and the skills, apply the
+        rules that fit. Raise this even though it is a style point: in this repository concise
+        documentation matters as much as correctness. Name specific passages to cut or move, with
+        an inline comment on each, for example "this schema detail belongs in PROTOCOL_STANDARD.md"
+        or "this restates decision 2". Don't comment on wording you would merely phrase
+        differently. Never suggest removing a decision, a rejected alternative a reader would
+        raise, or a stated limit.
   review:
     if: github.event_name == 'pull_request'
     permissions:
@@ -29,3 +39,5 @@ jobs:
       id-token: write
     uses: waldronlab/.github/.github/workflows/claude-review.yml@devel
     secrets: inherit
+    with:
+      review_focus: *review_focus
