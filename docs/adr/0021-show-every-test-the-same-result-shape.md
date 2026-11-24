@@ -1,6 +1,6 @@
 # 0021. Show Every Test of a Protocol the Same Result Shape
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-23
 - **Deciders:** Levi Waldron, Otto Infield-Harm
 
