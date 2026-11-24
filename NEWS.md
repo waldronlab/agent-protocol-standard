@@ -50,6 +50,24 @@
 
   `run_record` stays at 1: keys are added, none changes meaning.
 
+* The run record says more about what decided a run's outcome (ADR 0020, #61).
+  `check_test_result.py` 0.4.0 and the `test-protocol` skill 0.4.0:
+
+  * `run.yaml` records `results_digest`, a sha256 over the results the checker
+    compared, so a copy kept elsewhere can be shown to be the one checked.
+  * `abandoned: <reason>` in `executor.yaml` marks a run stopped before the
+    executor finished. Such a run is still checked, and the skill requires that
+    every run started with `--shape` is.
+  * Exit status 3 means no test failed but at least one was not run, including
+    when nothing was compared. Such runs used to exit 0, or 2 when nothing was
+    compared. Exit 2 now means only a contract error, with no record.
+  * `harness_config`, `model_digest`, `quantization` and `isolation_method` are
+    recommended additional keys under `executor`.
+  * The skill reports the executor's reply but treats the checker's report as
+    the evidence.
+
+  `run_record` stays at 1.
+
 * New `scripts/check_citations.py` checks the citations an agent gave when it
   ran a protocol, against the protocol's frontmatter. It reads the Method
   Provenance block in the format `protocol-runner` defines and reports, check
