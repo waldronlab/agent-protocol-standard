@@ -68,6 +68,26 @@
 
   `run_record` stays at 1.
 
+* New `scripts/check_citations.py` checks the citations an agent gave when it
+  ran a protocol, against the protocol's frontmatter. It reads the Method
+  Provenance block in the format `protocol-runner` defines and reports, check
+  by check:
+
+  * whether the block and its Level 1 and Level 2 headings are present;
+  * whether Level 1 names the right protocol, version, and DOIs, and leaves
+    out the Publication DOI for a first definition;
+  * whether Level 2 lists exactly the method origin citations, including a
+    composite's constituents, with no Level 1 citation moved into it;
+  * any DOI or PMID the protocol does not carry, in the block or elsewhere in
+    the output.
+
+  It exits 0 on pass, 1 on fail and 2 when it cannot run, as
+  `check_test_result.py` does, and 3 when nothing failed but the output has no
+  Draft Methods Section, so a caller can tell that apart without parsing the
+  report (`--require-methods` makes it a failure instead). It does not check when the block was written,
+  which only the transcript shows; resolving each cited DOI and PMID is
+  opt-in, with `--resolve`.
+
 # agent-protocol-standard 0.4.1 (2026-10-23)
 
 ## SIGNIFICANT USER-VISIBLE CHANGES
