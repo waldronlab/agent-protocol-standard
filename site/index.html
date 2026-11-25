@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Protocols Browser</title>
+<meta name="description" content="Search and browse AI agent-compatible scientific protocols across the protocol federation.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;else if(matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.dataset.theme="dark"}catch(e){}</script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav" aria-label="Site">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg></span>
+        Agent Protocols
+      </div>
+      <div class="nav-actions">
+        <a class="btn" href="https://github.com/waldronlab/agent-protocol-standard" rel="noopener">Standard</a>
+        <a class="btn" href="https://github.com/waldronlab/agent-protocols" rel="noopener">GitHub</a>
+        <button id="theme" class="btn icon" type="button" aria-label="Toggle dark mode" title="Toggle theme">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+      </div>
+    </nav>
+    <div class="hero">
+      <h1>Discover <span>agent-ready</span><br>scientific protocols</h1>
+      <p class="sub">Search and browse reviewed, machine-readable protocols across the whole federation.</p>
+      <div class="searchrow">
+        <label class="sr-only" for="q">Search protocols</label>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="q" type="search" placeholder="Search name, description, tags, packages, authors…" autocomplete="off" autofocus>
+        <kbd aria-hidden="true">/</kbd>
+      </div>
+      <div class="stats" id="stats"></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap layout">
+  <aside class="filters" aria-label="Filters">
+    <div class="fgroup"><h2>Category</h2><div id="f-category"></div></div>
+    <div class="fgroup"><h2>Status</h2><div id="f-status"></div></div>
+    <div class="fgroup"><h2>Type</h2><div id="f-type"></div></div>
+    <div class="fgroup"><h2>Registry</h2><div id="f-registry"></div></div>
+    <div class="fgroup"><h2>Reviewed</h2><div id="f-reviewed"></div></div>
+    <div class="fgroup"><h2>Tags</h2><div id="f-tags" class="tagcloud"></div></div>
+    <button id="clear" type="button" class="linkbtn">Clear all filters</button>
+  </aside>
+
+  <section aria-live="polite">
+    <div class="bar">
+      <span id="count"></span>
+      <label>Sort
+        <select id="sort">
+          <option value="relevance">Relevance</option>
+          <option value="name">Name</option>
+          <option value="date">Newest</option>
+        </select>
+      </label>
+    </div>
+    <div id="notices"></div>
+    <div id="results" class="cards"></div>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  <p>Data is read live from each registry's <code>PROTOCOLS.yaml</code>, discovered via the federation
+  <a href="https://github.com/waldronlab/agent-protocol-standard/blob/main/registry.yaml">registry.yaml</a>.
+  This page is static; no server or build step.</p>
+</footer>
+
+<script src="vendor/js-yaml.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
