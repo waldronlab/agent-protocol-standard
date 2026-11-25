@@ -1,4 +1,5 @@
 """Protocol tests: the test.yaml schema, the validator's tests/ checks, and the checker."""
+import os
 import shutil
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -908,6 +909,30 @@ def test_results_digest_skips_symlinks_rather_than_refusing_the_run(repo, tmp_pa
     executor(results)
     assert checker.main([str(tests), str(results)]) == 0
     assert yaml.safe_load((results / "run.yaml").read_text())["results_digest"] == expected
+
+
+def test_results_digest_hashes_an_unreadable_file_rather_than_refusing_the_run(repo, tmp_path, capsys):
+    import hashlib
+    results, bundle = tmp_path / "results", tmp_path / "bundle"
+    tests = repo / "protocols/example-protocol/tests"
+    shape(repo, results, capsys, "--bundle", str(bundle))
+    passing_results(bundle / "results")
+    locked = bundle / "results/locked.txt"
+    locked.write_text("the executor left this unreadable\n")
+    locked.chmod(0)
+    try:
+        if os.access(locked, os.R_OK):
+            pytest.skip("permissions are not enforced here (running as root)")
+        executor(results)
+        assert checker.main([str(tests), str(results)]) == 0
+        record = yaml.safe_load((results / "run.yaml").read_text())
+        digest = record["results_digest"]
+    finally:
+        locked.chmod(0o644)
+    # the same tree with the marker as the file's contents
+    assert record["unreadable_results"] == ["results/locked.txt"]
+    locked.write_bytes(checker.UNREADABLE_MARKER)
+    assert digest == archived_digest(bundle / "results")
 
 
 def test_results_digest_is_reserved(repo, tmp_path, capsys):
