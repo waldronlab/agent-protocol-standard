@@ -21,12 +21,33 @@
     }).then(function (t) { return jsyaml.load(t, { schema: jsyaml.CORE_SCHEMA }); });
   }
 
+  function deps(v) {
+    return arr(v).map(function (d) {
+      if (d && typeof d === 'object') return { name: str(d.name), repository: str(d.repository), version: str(d.version) };
+      return { name: str(d), repository: '', version: '' };
+    }).filter(function (d) { return d.name; });
+  }
+  function depLabel(d) { return d.name + (d.version ? ' v' + d.version : '') + (d.repository ? ' (' + d.repository + ')' : ''); }
+
+  // Citations are a DOI (10.x/...) or a PubMed ID (PMID:123); each needs its own resolver.
+  function citationUrl(c) {
+    c = str(c).trim();
+    var m = /^PMID:\s*(\d+)$/i.exec(c);
+    if (m) return 'https://pubmed.ncbi.nlm.nih.gov/' + m[1] + '/';
+    if (/^10\.\d{4,9}\//.test(c)) return 'https://doi.org/' + c.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
+    return '';
+  }
+
   function arr(v) { return Array.isArray(v) ? v : (v == null ? [] : [v]); }
   function str(v) { return v == null ? '' : String(v); }
 
   function normalize(p, registryName) {
     var reviews = arr(p.reviews);
-    var approved = reviews.some(function (r) { return r && r.status === 'approved'; });
+    // An approval counts only for the version it reviewed; a later release is not approved by it.
+    var version = str(p.version);
+    var approved = reviews.some(function (r) {
+      return r && r.status === 'approved' && str(r.protocol_version) === version;
+    });
     var n = {
       raw: p, registry: registryName,
       name: str(p.name), description: str(p.description).replace(/\s+/g, ' ').trim(),
@@ -34,13 +55,13 @@
       category: str(p.category) || 'Uncategorized', date: str(p.date),
       tags: arr(p.tags).map(str), packages: arr(p.key_packages).map(str),
       authors: arr(p.authors).map(function (a) { return a && a.name ? str(a.name) : str(a); }),
-      reviews: reviews, reviewed: approved ? 'Approved review' : 'No approved review',
+      reviews: reviews, reviewed: approved ? 'Approved (current version)' : 'Not approved for current version',
       url: safeUrl(p.protocol_url)
     };
     n.haystack = {
       name: n.name.toLowerCase(), tags: n.tags.join(' ').toLowerCase(),
       desc: n.description.toLowerCase(),
-      other: [n.category, n.packages.join(' '), n.authors.join(' '), arr(p.protocols_used).join(' '),
+      other: [n.category, n.packages.join(' '), n.authors.join(' '), deps(p.protocols_used).map(function (d) { return d.name + ' ' + d.repository; }).join(' '),
         arr(p.upstream_repositories).join(' '), arr(p.database_urls).join(' ')].join(' ').toLowerCase()
     };
     return n;
@@ -166,7 +187,7 @@
 
     var meta = el('div', 'meta');
     meta.appendChild(el('span', 'badge ' + p.status, p.status));
-    if (p.reviewed === 'Approved review') meta.appendChild(el('span', 'badge rev', 'reviewed'));
+    if (p.reviewed === 'Approved (current version)') meta.appendChild(el('span', 'badge rev', 'reviewed'));
     [p.type, p.category, p.version && 'v' + p.version, p.date, p.registry].forEach(function (x) { if (x) meta.appendChild(el('span', null, x)); });
     c.appendChild(meta);
 
@@ -197,14 +218,15 @@
     var raw = p.raw;
     row('Authors', p.authors);
     row('Key packages', p.packages);
-    row('Uses protocols', arr(raw.protocols_used).map(str));
+    row('Uses protocols', deps(raw.protocols_used).map(depLabel));
     row('Upstream repos', arr(raw.upstream_repositories).map(str), function (x) { return x; });
     row('Databases', arr(raw.database_urls).map(str), function (x) { return x; });
-    row('Protocol DOI', str(raw.protocol_citation), function (x) { return 'https://doi.org/' + x; });
-    row('Method origin', str(raw.method_origin_citation), function (x) { return 'https://doi.org/' + x; });
-    row('Collection DOI', str(raw.collection_doi), function (x) { return 'https://doi.org/' + x; });
+    row('Protocol citation', str(raw.protocol_citation), citationUrl);
+    row('Method origin', str(raw.method_origin_citation), citationUrl);
+    row('Collection DOI', str(raw.collection_doi), citationUrl);
+    row('Artifact DOI', str(raw.artifact_doi), citationUrl);
     row('License', str(raw.license));
-    row('Reviews', p.reviews.map(function (r) { return (r.name || '?') + ' — ' + (r.status || '?') + (r.date ? ' (' + r.date + ')' : ''); }));
+    row('Reviews', p.reviews.map(function (r) { return (r.name || '?') + ' — ' + (r.status || '?') + (r.protocol_version ? ' for v' + r.protocol_version : '') + (r.date ? ' (' + r.date + ')' : ''); }));
     row('Raw protocol (for agents)', p.url ? [p.url] : [], function (x) { return x; });
     det.appendChild(dl); c.appendChild(det);
     return c;
@@ -226,7 +248,7 @@
 
     $('count').textContent = rows.length + ' of ' + all.length + ' protocols';
     var regs = new Set(all.map(function (p) { return p.registry; })).size;
-    var rev = all.filter(function (p) { return p.reviewed === 'Approved review'; }).length;
+    var rev = all.filter(function (p) { return p.reviewed === 'Approved (current version)'; }).length;
     $('stats').innerHTML = '';
     [[all.length, 'protocols'], [regs, regs === 1 ? 'registry' : 'registries'], [rev, 'reviewed']].forEach(function (x) {
       var s = el('span'); s.appendChild(el('b', null, String(x[0]))); s.appendChild(document.createTextNode(' ' + x[1])); $('stats').appendChild(s);
