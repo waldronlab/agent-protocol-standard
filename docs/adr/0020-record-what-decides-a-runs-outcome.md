@@ -1,147 +1,54 @@
 # 0020. Record What Decides a Test Run's Outcome
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-18
 - **Deciders:** Levi Waldron, Otto Infield-Harm
 
-## Context and Problem Statement
+Amends ADR 0019.
 
-ADR 0019 isolated the executor of a protocol's tests from the checker. Issue #61 reports runs of
-`test-protocol` 0.3.0 in isolated mode, with Claude subagents and with small open-weight models
-through a minimal tool-calling harness. Each check worked as specified, but four facts that
-decided the outcome were missing from `run.yaml`:
+## Context
 
-1. **What the executor wrote.** Weak executors replied with a plausible result for every test
-   while writing nothing. The checker correctly recorded `not_run`, but the record kept no trace
-   of what was written, so a reader could not later tell a run's results from any others. The
-   same is true of a pass.
-2. **The harness's settings.** Whether the model's reasoning stays in its context, the context
-   window, the output cap per turn, the system prompt, and how clearly a tool reports a bad call
-   each decided whether a run could finish. `harness: <name> <version>` records none of them. A
-   model tag such as `qwen3:4b` can move and hides the quantization.
-3. **Abandoned runs.** ADR 0019 forbids checking a run twice, but a run that was shaped, started
-   and abandoned before the check leaves nothing behind. An invoker could abandon runs that look
-   bad, check only the good ones, and the records would look clean.
-4. **How the executor was isolated.** `isolation: container` covers a container with only the
-   bundle mounted, an OS sandbox around a tool loop, and a virtual machine.
+Issue #61 reports runs of `test-protocol` 0.3.0 in isolated mode, with Claude subagents and with small open-weight models. Each check worked as specified, but four facts that decided the outcome were missing from `run.yaml`:
 
-The study in #5 compares runs across executors, and the archive in
-`waldronlab/agent-protocol-runs` (#44) keeps their records. Both need these facts in the record.
+1. **What the executor wrote.** Weak executors replied with a plausible result for every test while writing nothing. The record kept no trace of what was written, for a failure or a pass.
+2. **The harness's settings.** Context window, output cap, system prompt and whether reasoning stays in context each decided whether a run could finish. `harness: <name> <version>` records none of them, and a model tag such as `qwen3:4b` can move and hides the quantization.
+3. **Abandoned runs.** A run that was shaped and then abandoned leaves nothing behind, so an invoker could check only the runs that look good.
+4. **How the executor was isolated.** `isolation: container` covers a container, an OS sandbox and a virtual machine.
+
+The study in #5 and the archive in `waldronlab/agent-protocol-runs` (#44) both need these facts.
 
 ## Decision
 
-### 1. The record carries a digest of the results
+1. **A digest of the results.** The checker writes `results_digest` into `run.yaml`: a sha256 over the executor's results, taken before comparing and computed as `source_digest` is. It covers `<bundle>/results/` but not `work/`. Without a bundle, it covers the test subdirectories of the results directory. Symlinks are skipped instead of refused, because the executor controls this tree and a refusal would let it prevent its own record. `executor.yaml` may not supply this key.
+2. **Every shaped run is checked.** A run stopped early gets an `executor.yaml` with `abandoned: <reason>` and is checked like any other. The checker copies the reason into the record and prints it. The `test-protocol` skill requires every run started with `--shape` to end in a check.
+3. **Each exit status has one meaning.**
 
-The checker writes `results_digest` into `run.yaml`: a sha256 over the results, taken at check
-time, before comparing, and computed as `source_digest` is: for each file in order of its path,
-the path, a NUL byte, the contents and a NUL byte.
+   | Exit | Meaning | `run.yaml` written? |
+   |---|---|---|
+   | 0 | every test ran and passed | yes |
+   | 1 | at least one test failed | yes |
+   | 2 | the checker could not run (contract error) | no |
+   | 3 | no test failed, but at least one is `not_run`, including when nothing was compared | yes |
 
-- With a bundle it covers every file under `<bundle>/results/` except symlinks (below), including
-  files the executor left there beyond its results. It does not cover `<bundle>/work/`, the executor's scratch space.
-- Without a bundle it covers the subdirectories of the results directory. The top-level files
-  (`source.yaml`, `executor.yaml`) are the invoker's and the checker's, and `.remote/` is the
-  checker's download cache.
-- Each path is written as `results/<path under that directory>`, so the digest of a copy kept as
-  `results/` beside its `run.yaml`, as the archive keeps it, can be recomputed without knowing
-  where the bundle was.
-- Symlinks are neither followed nor covered. `source_digest` refuses them, but the executor
-  controls the results tree, and a refusal would let it prevent its own record. The omission is
-  not silent where it matters: the archive refuses symlinks, and a copy that replaces one with the
-  file it points to no longer matches the digest.
+   The code depends only on the results, so `abandoned` does not change it. `check_citations.py` (#67) uses 3 the same way.
+4. **Recommended keys for settings.** Under `executor`, the standard recommends `harness_config`, `model_digest`, `quantization` and `isolation_method`. They are recommended, not defined, until more than one harness has used them. `container` keeps its meaning (the executor could reach only the bundle), however that was enforced, and `isolation_method` says how.
+5. **The executor's reply is not evidence.** Where it disagrees with the checker's report, the skill says so.
 
-`results_digest` is reserved: `executor.yaml` may not supply it.
-
-### 2. Every shaped run is checked, including abandoned ones
-
-A run stopped before the executor finished still gets an `executor.yaml`, with `abandoned:
-<reason>` at the top level, and is checked. `abandoned` is a defined key: when present it is
-non-empty text, and the checker copies it into the record and prints it. The checker needs no
-other change. It already records every test without a result as `not_run`.
-
-`abandoned` does not change the exit status, which depends only on the results (decision 3). An
-abandoned run with no failures has `not_run` tests and exits 3, as any incomplete run does.
-Whether a run was abandoned is read from the record, which is what the archive and its index
-count.
-
-The `test-protocol` skill gains the rule that every run started with `--shape` ends in a check.
-The checker cannot enforce it, since a run that is never checked leaves nothing for it to see.
-The rule makes discarding a run a violation rather than a permitted path.
-
-### 3. The exit status separates an incomplete run from a pass and from a contract error
-
-| Exit | Meaning | `run.yaml` written? |
-|---|---|---|
-| 0 | every test ran and passed | yes |
-| 1 | at least one test failed | yes |
-| 2 | the checker could not run (contract error) | no |
-| 3 | no test failed, but at least one is `not_run`, including when nothing was compared | yes |
-
-In 0.3.0, a run with passes and `not_run` tests exited 0, the same as a complete pass, and a run
-in which nothing was compared exited 2, the same as a contract error. A caller reading only the
-exit status could not tell a stopped run from a complete one, and told the two meanings of 2
-apart only by whether `run.yaml` existed. Each code now has one meaning.
-
-The code depends only on the results, so two runs with the same results exit the same way
-whatever the reason tests were not run. `check_citations.py` (#67) uses 3 for the same kind of
-outcome: nothing failed, but something expected is missing.
-
-### 4. Settings that decide the outcome are recommended keys first
-
-The standard and the skill recommend recording, under `executor`:
-
-- `harness_config`, a mapping of every harness setting that changes the executor's behaviour;
-- `model_digest` and `quantization`, for open-weight models;
-- `isolation_method`, free text saying how `isolation` was achieved.
-
-They are recommended, not defined. Only a few harnesses have been used so far, and the names
-will probably change once a second is in common use. The standard already preserves additional
-keys, so nothing needs to change to record them, and they are promoted once they settle.
-
-`isolation` keeps its three values. `container` is defined by what the executor could reach,
-nothing but the bundle, not by how that was enforced. A container, an OS sandbox or a virtual
-machine that meets that keeps the value and says how in `isolation_method`. One that cannot
-honestly claim it is the case for a new value.
-
-### 5. The executor's reply is not evidence
-
-The skill reports the executor's reply, but the checker's report is the evidence, and the skill
-says so where they disagree.
-
-### Versions
-
-`check_test_result.py` becomes 0.4.0 and the `test-protocol` skill 0.4.0. `run_record` stays
-at 1: keys are added, and none changes meaning.
+`check_test_result.py` and the skill become 0.4.0. `run_record` stays at 1.
 
 ## Alternatives Considered
 
-- **Amend ADR 0019 in place.** Rejected: checking abandoned runs and the results digest are new
-  decisions, not corrections to what 0019 says.
-- **Define `harness_config`, `isolation_method` and `model_digest` now.** Rejected for now: a
-  defined key's meaning is fixed by `run_record`, and these names have been tried with one
-  harness.
-- **Add `sandbox` and `vm` to `isolation`.** Rejected: `isolation` says what the executor could
-  reach, which is what a reader comparing runs needs. How that was enforced is a detail, kept in
-  `isolation_method`.
-- **Digest `work/` as well.** Rejected: it is scratch space, often large, and not what was
-  compared. Its contents are in the transcript.
-- **Hash paths relative to `results/`, without the prefix.** Equivalent in strength. The prefix
-  matches how the archive keeps a run, `results/` beside `run.yaml`, and how `source_digest`
-  names its files relative to the protocol directory (`tests/...`).
-- **An exit status of its own for an abandoned run.** Rejected: it would give the same results
-  two exit statuses depending on why tests were not run.
-- **Keep 0.3.0's codes and reword exit 2 as having two meanings.** The first draft of this ADR.
-  Rejected in review: callers would have to read `run.yaml` to see that a run is incomplete, or
-  check whether it exists to tell "nothing compared" from a contract error. Few callers of 0.3.0
-  exist, so changing what they see costs little.
+- **Define the recommended keys now.** Rejected: the names have been tried with only one harness.
+- **Add `sandbox` and `vm` to `isolation`.** Rejected: `isolation` records what the executor could reach, and that is what comparing runs needs.
+- **Digest `work/` too.** Rejected: it is scratch space and is not compared.
+- **A separate exit status for abandoned runs.** Rejected: the same results would get two exit statuses.
 
 ## Consequences
 
-- A copy of a run's results can be shown to be the one that was checked, wherever it is kept.
-  The archive's validator recomputes `results_digest` the same way.
-- Abandoned runs are counted apart from runs where the executor wrote nothing.
-- Records written by checker 0.3.0 have no `results_digest`. The archive accepts them, and
-  verifies the digest only when the record has one.
-- Nothing stops an invoker from discarding a run that was never checked. The rule makes it a
-  violation, but nothing records that a run was shaped, so it cannot be detected yet.
-- `harness_config` and the other recommended keys can be written differently by different
-  people until they are defined. An index that compares runs on them has to allow for that.
+- A copy of a run's results can be shown to be the one that was checked. The archive's validator recomputes the digest the same way.
+- Abandoned runs are counted separately from runs where the executor wrote nothing.
+- Records from checker 0.3.0 have no `results_digest`. The archive accepts them.
+- Nothing can detect a run that was shaped and never checked. The rule makes discarding it a violation.
+- Until the recommended keys are defined, people may record them differently.
+
+Drafted with Claude Code. Shortened by Levi Waldron with Claude Code.
