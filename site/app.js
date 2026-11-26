@@ -297,6 +297,33 @@
     $('q').value = state.q; $('sort').value = state.sort;
   }
 
+
+  // Decorative terminal line: types `agent run <protocol>` for each loaded protocol in turn.
+  function startTicker() {
+    var tk = $('tk');
+    if (!tk || matchMedia('(prefers-reduced-motion: reduce)').matches || !all.length) return;
+    var names = all.map(function (p) { return p.name; });
+    var i = 0, n = 0, phase = 'type', text = '';
+    function tick() {
+      var delay = 40;
+      if (document.hidden) { setTimeout(tick, 1000); return; }
+      if (phase === 'type') {
+        text = 'agent run ' + names[i % names.length];
+        n++; tk.textContent = text.slice(0, n);
+        if (n >= text.length) { phase = 'hold'; delay = 500; }
+      } else if (phase === 'hold') {
+        tk.textContent = text + ' ';
+        var ok = document.createElement('span'); ok.className = 'ok'; ok.textContent = '\u2713'; tk.appendChild(ok);
+        phase = 'erase'; delay = 1500;
+      } else {
+        n = text.length; tk.textContent = ''; phase = 'type'; i++; n = 0; delay = 350;
+      }
+      setTimeout(tick, delay);
+    }
+    tk.textContent = '';
+    tick();
+  }
+
   function init() {
     $('q').addEventListener('input', function (e) { state.q = e.target.value; sync(); render(); });
     $('sort').addEventListener('change', function (e) { state.sort = e.target.value; sync(); render(); });
@@ -328,7 +355,7 @@
       if (e.key === '/' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) { e.preventDefault(); $('q').focus(); }
     });
     readHash();
-    load(false).then(function () { render(); showSynced(); });
+    load(false).then(function () { render(); showSynced(); startTicker(); });
     $('refresh').addEventListener('click', refresh);
     // Stay in sync with GitHub: re-pull every 5 minutes, and when the tab regains focus after a while.
     setInterval(function () { if (!document.hidden) refresh(); }, 5 * 60 * 1000);
