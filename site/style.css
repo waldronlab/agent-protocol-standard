@@ -123,3 +123,12 @@ mark{background:hsl(var(--primary)/.2);color:inherit;border-radius:3px;padding:0
 .foot{color:hsl(var(--muted-foreground));font-size:.8rem;padding-top:20px;padding-bottom:40px;border-top:1px solid hsl(var(--border))}
 @media(max-width:820px){.top{padding:44px 0 28px}.layout{grid-template-columns:1fr;gap:8px}.filters{position:static;border-bottom:1px solid hsl(var(--border));padding-bottom:8px}.stats{flex-wrap:wrap;gap:6px 18px}kbd{display:none}#q{padding-right:16px}.nav-actions>a{display:none}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* Only real buttons are bubbles. Static text (status, metadata, #tags on cards) stays plain. */
+.filters .tag{border-radius:999px;padding:3px 12px}
+.sync button{border-radius:999px;padding:0 14px}
+.switch,.switch button{border-radius:999px}
+.switch button{padding:0 14px}
+select{border-radius:999px;padding-left:14px}
+kbd{border-radius:999px;padding:2px 9px}
+input[type=checkbox]{border-radius:50%}
