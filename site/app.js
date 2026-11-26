@@ -14,8 +14,9 @@
   var state = { q: '', category: new Set(), status: new Set(), type: new Set(), registry: new Set(), reviewed: new Set(), tags: new Set(), sort: 'relevance' };
 
   // ---- loading ----
-  function fetchYaml(url) {
-    return fetch(url, { cache: 'no-cache' }).then(function (r) {
+  // raw.githubusercontent.com caches for ~5 minutes; a fresh query string bypasses stale copies.
+  function fetchYaml(url, bust) {
+    return fetch(url + (bust ? '?_=' + Date.now() : ''), { cache: 'no-store' }).then(function (r) {
       if (!r.ok) throw new Error(url + ' → HTTP ' + r.status);
       return r.text();
     }).then(function (t) { return jsyaml.load(t, { schema: jsyaml.CORE_SCHEMA }); });
@@ -76,24 +77,42 @@
     return m ? 'https://github.com/' + m[1] + '/' + m[2] + '/blob/' + m[3] + '/' + m[4] : u;
   }
 
-  function load() {
+  var meta = {};   // registry name -> generated_at of its PROTOCOLS.yaml
+  var lastLoad = 0;
+
+  function load(bust) {
     var notices = $('notices');
+    notices.textContent = '';
     function notice(msg) { var d = document.createElement('div'); d.className = 'notice'; d.textContent = msg; notices.appendChild(d); }
 
-    return fetchYaml(REGISTRY_URL).then(function (reg) { return arr(reg && reg.registries); })
+    return fetchYaml(REGISTRY_URL, bust).then(function (reg) { return arr(reg && reg.registries); })
       .catch(function (e) { notice('Could not load the federation registry; showing the default registry only. (' + e.message + ')'); return FALLBACK_REGISTRIES; })
       .then(function (regs) {
         return Promise.all(regs.map(function (r) {
           var rname = str(r.name);
           var url = safeUrl(r.index_url);
           if (!url) { notice('Registry ' + rname + ' has no valid index_url.'); return []; }
-          return fetchYaml(url).then(function (idx) {
+          return fetchYaml(url, bust).then(function (idx) {
+            meta[rname] = str(idx && idx.generated_at);
             return arr(idx && idx.protocols).map(function (p) { return normalize(p || {}, rname); });
           }).catch(function (e) { notice('Could not load registry ' + rname + ': ' + e.message); return []; });
         }));
       }).then(function (lists) {
-        all = [].concat.apply([], lists).filter(function (p) { return p.name; });
+        var fresh = [].concat.apply([], lists).filter(function (p) { return p.name; });
+        if (fresh.length || !all.length) all = fresh; // keep the last good data if a refresh fails entirely
+        lastLoad = Date.now();
       });
+  }
+
+  function showSynced() {
+    var gen = Object.keys(meta).map(function (k) { return meta[k]; }).filter(Boolean).sort().pop();
+    var t = new Date(lastLoad).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    $('synced').textContent = lastLoad ? 'Synced ' + t + (gen ? ' · index built ' + gen.replace('T', ' ').replace(/:\d\dZ$/, ' UTC') : '') : '';
+  }
+
+  function refresh() {
+    var b = $('refresh'); b.disabled = true; b.textContent = 'Refreshing…';
+    return load(true).then(function () { render(); showSynced(); }).then(function () { b.disabled = false; b.textContent = 'Refresh'; });
   }
 
   // ---- search ----
@@ -309,7 +328,13 @@
       if (e.key === '/' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) { e.preventDefault(); $('q').focus(); }
     });
     readHash();
-    load().then(render);
+    load(false).then(function () { render(); showSynced(); });
+    $('refresh').addEventListener('click', refresh);
+    // Stay in sync with GitHub: re-pull every 5 minutes, and when the tab regains focus after a while.
+    setInterval(function () { if (!document.hidden) refresh(); }, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && Date.now() - lastLoad > 2 * 60 * 1000) refresh();
+    });
   }
 
   if (typeof module !== 'undefined') module.exports = { normalize: normalize, score: score };
