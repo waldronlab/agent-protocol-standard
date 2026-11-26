@@ -288,11 +288,23 @@
     window.addEventListener('hashchange', function () { readHash(); render(); });
     $('count').textContent = 'Loading…';
     for (var i = 0; i < 3; i++) $('results').appendChild(el('div', 'skeleton'));
-    $('theme').addEventListener('click', function () {
-      var d = document.documentElement, next = d.dataset.theme === 'dark' ? 'light' : 'dark';
-      d.dataset.theme = next;
-      try { localStorage.setItem('theme', next); } catch (e) {}
+    function currentTheme() {
+      var t = document.documentElement.dataset.theme;
+      return t || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    }
+    function showTheme() {
+      var t = currentTheme();
+      $('theme-light').setAttribute('aria-pressed', String(t === 'light'));
+      $('theme-dark').setAttribute('aria-pressed', String(t === 'dark'));
+    }
+    ['light', 'dark'].forEach(function (t) {
+      $('theme-' + t).addEventListener('click', function () {
+        document.documentElement.dataset.theme = t;
+        try { localStorage.setItem('theme', t); } catch (e) {}
+        showTheme();
+      });
     });
+    showTheme();
     document.addEventListener('keydown', function (e) {
       if (e.key === '/' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) { e.preventDefault(); $('q').focus(); }
     });
