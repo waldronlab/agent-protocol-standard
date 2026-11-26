@@ -5,30 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Protocols Browser</title>
 <meta name="description" content="Search and browse AI agent-compatible scientific protocols across the protocol federation.">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+
 <link rel="stylesheet" href="style.css">
 <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t;else if(matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.dataset.theme="dark"}catch(e){}</script>
 </head>
 <body>
-<header class="top">
-  <div class="wrap">
+<div class="navbar"><div class="wrap">
     <nav class="nav" aria-label="Site">
       <div class="brand">
         <span class="logo" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg></span>
         Agent Protocols
       </div>
       <div class="nav-actions">
-        <a class="btn" href="https://github.com/waldronlab/agent-protocol-standard" rel="noopener">Standard</a>
-        <a class="btn" href="https://github.com/waldronlab/agent-protocols" rel="noopener">GitHub</a>
+        <a href="https://github.com/waldronlab/agent-protocol-standard" rel="noopener">Standard</a>
+        <a href="https://github.com/waldronlab/agent-protocols" rel="noopener">GitHub</a>
         <div class="switch" role="group" aria-label="Color theme">
           <button id="theme-light" type="button" aria-pressed="false">Light</button>
           <button id="theme-dark" type="button" aria-pressed="false">Dark</button>
         </div>
       </div>
     </nav>
+</div></div>
+<header class="top">
+  <div class="wrap">
+
     <div class="hero">
-      <h1>Discover <span>agent-ready</span><br>scientific protocols</h1>
+      <h1>Scientific protocols.<br><span>Ready for agents.</span></h1>
       <p class="sub">Search and browse reviewed, machine-readable protocols across the whole federation.</p>
       <div class="searchrow">
         <label class="sr-only" for="q">Search protocols</label>
