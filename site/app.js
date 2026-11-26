@@ -315,8 +315,10 @@
         tk.textContent = text + ' ';
         var ok = document.createElement('span'); ok.className = 'ok'; ok.textContent = '\u2713'; tk.appendChild(ok);
         phase = 'erase'; delay = 1500;
+      } else if (n > 0) {
+        n--; tk.textContent = text.slice(0, n); delay = 24; // backspace one character at a time
       } else {
-        n = text.length; tk.textContent = ''; phase = 'type'; i++; n = 0; delay = 350;
+        phase = 'type'; i++; delay = 350;
       }
       setTimeout(tick, delay);
     }
