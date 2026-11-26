@@ -100,7 +100,7 @@ select{height:30px;padding:0 28px 0 10px;font:inherit;font-size:.85rem;color:hsl
 .card h3 a:hover{color:hsl(var(--primary));text-decoration:none}
 .card p{margin:.45rem 0 .9rem;color:hsl(var(--muted-foreground));font-size:.95rem}
 .meta{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;font-size:.84rem;color:hsl(var(--muted-foreground))}
-.meta>*+*::before{content:"·";margin-right:8px;color:hsl(var(--muted-foreground)/.6)}
+.meta>*:not(:last-child)::after{content:"·";margin-left:8px;color:hsl(var(--muted-foreground)/.6)}
 .badge{font-weight:600;text-transform:capitalize}
 .badge.stable,.badge.rev{color:hsl(var(--success))}
 .badge.draft,.badge.unknown{color:hsl(var(--warn))}
@@ -139,3 +139,5 @@ input[type=checkbox]{border-radius:50%}
 .ticker .ok{color:hsl(var(--success))}
 .caret{display:inline-block;width:.55em;height:1.05em;margin-left:2px;vertical-align:-.2em;background:hsl(var(--muted-foreground)/.7);animation:blink 1.1s steps(1) infinite}
 @keyframes blink{50%{opacity:0}}
+
+@media(max-width:520px){dl{grid-template-columns:1fr;gap:2px}dt{margin-top:10px;font-size:.8rem}.card{padding:18px}}
