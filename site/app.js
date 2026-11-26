@@ -206,7 +206,7 @@
 
     var meta = el('div', 'meta');
     meta.appendChild(el('span', 'badge ' + p.status, p.status));
-    if (p.reviewed === 'Approved (current version)') meta.appendChild(el('span', 'badge rev', 'reviewed'));
+    if (p.reviewed === 'Approved (current version)') meta.appendChild(el('span', 'badge rev', '✓ Reviewed'));
     [p.type, p.category, p.version && 'v' + p.version, p.date, p.registry].forEach(function (x) { if (x) meta.appendChild(el('span', null, x)); });
     c.appendChild(meta);
 
