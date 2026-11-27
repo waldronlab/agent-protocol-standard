@@ -1,0 +1,34 @@
+name: Deploy Protocol Browser
+
+# The browser in site/ is static and reads PROTOCOLS.yaml live from raw.githubusercontent.com, so it
+# needs redeploying only when the site itself changes. Enable it once under
+# Settings → Pages → Source: "GitHub Actions".
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['site/**', '.github/workflows/pages.yml']
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

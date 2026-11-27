@@ -98,6 +98,14 @@ need.
 Note that `generate-index` runs with `contents: write` where no App is configured, since GITHUB_TOKEN
 does the push in that case.
 
+## Browse the federation
+
+[`site/`](site/) is a static, no-build search frontend for the federation. It reads
+[`registry.yaml`](registry.yaml), loads every registered `PROTOCOLS.yaml`, and offers full-text search
+with category, status, type, registry, review and tag filters. It is published with GitHub Pages
+(`.github/workflows/pages.yml`; set Settings → Pages → Source to "GitHub Actions" once). To preview
+locally: `python3 -m http.server -d site`.
+
 ## Development
 
 *   `pytest tests/` runs the whole suite. With no protocols in this repository, it is
