@@ -2,6 +2,16 @@
 
 This directory contains Architecture Decision Records (ADRs) for the `agent-protocol-standard` repository.
 
+## Writing an ADR
+
+Start from [template.md](template.md). An ADR records what was decided and why. Keep it short:
+
+- Formats, schemas, file layouts and algorithms go in `PROTOCOL_STANDARD.md` or the skill, not the ADR. Link to them.
+- The context summarises the issue and links to it. Don't repeat the issue's examples and tables.
+- Give each reason once. Don't repeat an argument made under another decision.
+- List an alternative only if a reader would plausibly propose it, with one line on why it was rejected.
+- Leave out drafting history, such as what an earlier draft said. It belongs in the PR.
+
 ## Index
 
 - [0001. Protocol Format and Federation Standard](0001-protocol-standard.md)
@@ -23,5 +33,7 @@ This directory contains Architecture Decision Records (ADRs) for the `agent-prot
 - [0017. Conditions on Materials: Where They Live and What a Violation Means](0017-conditions-on-materials.md) — extends 0012 and 0016
 - [0018. Resolve Dependencies from the Composite, Not the Index](0018-resolve-dependencies-without-the-index.md) — amends 0004 and 0008
 - [0019. Isolate the Executor from the Checker](0019-isolate-the-executor-from-the-checker.md) — amends 0016
+- [0020. Record What Decides a Test Run's Outcome](0020-record-what-decides-a-runs-outcome.md) — amends 0019
+- [0021. Show Every Test of a Protocol the Same Result Shape](0021-show-every-test-the-same-result-shape.md) — amends 0016 and 0019
 
 
